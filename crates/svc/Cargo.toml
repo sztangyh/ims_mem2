@@ -1,0 +1,12 @@
+[package]
+name = "ims_svc"
+version = "0.1.0"
+edition = "2021"
+
+[[bin]]
+name = "ims_svc"
+path = "src/main.rs"
+
+[dependencies]
+ims_mem2 = { path = "../core" }
+serde_json = "1"

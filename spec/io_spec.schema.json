@@ -1,0 +1,210 @@
+{
+  "$schema": "http://json-schema.org/draft-07/schema#",
+  "$id": "io_spec.schema.json",
+  "title": "io_spec v2 —— 服务层中间对象(IO)定义",
+  "type": "object",
+  "required": ["spec", "version", "io", "functions", "coverage"],
+  "additionalProperties": true,
+  "properties": {
+    "spec": { "const": "io_spec" },
+    "version": { "type": "integer", "minimum": 2 },
+    "date": { "type": "string" },
+    "note": { "type": "string" },
+    "schema": { "type": "string" },
+    "field_kinds": { "type": "object" },
+    "field_types": { "type": "array", "items": { "enum": ["str", "int", "bool"] } },
+    "field_forms": { "type": "object" },
+    "cardinality": { "type": "object" },
+    "functions": {
+      "type": "object",
+      "additionalProperties": {
+        "type": "object",
+        "required": ["in", "out", "impl"],
+        "properties": {
+          "in": { "type": "string" },
+          "out": { "type": "string" },
+          "impl": { "type": "string" },
+          "note": { "type": "string" }
+        }
+      }
+    },
+    "io": { "type": "array", "minItems": 1, "items": { "$ref": "#/definitions/io" } },
+    "coverage": { "type": "array", "items": { "$ref": "#/definitions/coverage" } },
+    "errors": { "type": "object" },
+    "paging": { "type": "object" }
+  },
+  "definitions": {
+    "io": {
+      "type": "object",
+      "required": ["name", "summary", "scope", "grain", "source", "fields", "links"],
+      "properties": {
+        "name": { "type": "string", "pattern": "^[A-Z][A-Za-z0-9]*$" },
+        "summary": { "type": "string" },
+        "scope": {
+          "type": "object",
+          "required": ["ne_types", "status"],
+          "properties": {
+            "ne_types": { "type": "array", "items": { "enum": ["AGCF", "MGW"] } },
+            "status": { "enum": ["ok", "blocked", "legacy_only"] },
+            "reason": { "type": "string" }
+          },
+          "if": { "properties": { "status": { "not": { "const": "ok" } } } },
+          "then": { "required": ["reason"] }
+        },
+        "grain": {
+          "type": "object",
+          "required": ["key", "from_rows"],
+          "properties": {
+            "key": { "type": "array", "minItems": 1, "items": { "type": "string" } },
+            "from_rows": { "enum": ["one", "many"] },
+            "collapse": {
+              "oneOf": [
+                { "type": "null" },
+                {
+                  "type": "object",
+                  "required": ["by"],
+                  "properties": {
+                    "field": { "type": "string" },
+                    "by": { "enum": ["union", "longest", "all", "first", "sum"] },
+                    "over": { "type": "array", "items": { "type": "string" } },
+                    "note": { "type": "string" }
+                  }
+                }
+              ]
+            },
+            "note": { "type": "string" }
+          }
+        },
+        "variants": {
+          "type": "array",
+          "items": {
+            "type": "object",
+            "required": ["when", "fields"],
+            "properties": {
+              "when": { "type": "object" },
+              "fields": { "type": "array", "items": { "type": "string" } }
+            }
+          }
+        },
+        "role_axis": { "type": "object" },
+        "source": {
+          "type": "array",
+          "minItems": 1,
+          "items": {
+            "type": "object",
+            "required": ["table", "role"],
+            "properties": {
+              "table": { "type": "string" },
+              "moc": { "type": "string" },
+              "role": { "type": "string" },
+              "note": { "type": "string" },
+              "tg_type": { "type": "string" },
+              "direction_param": { "type": ["string", "null"] },
+              "key_col": { "type": "string" },
+              "kind": { "type": "string" }
+            }
+          }
+        },
+        "fields": { "type": "array", "minItems": 1, "items": { "$ref": "#/definitions/field" } },
+        "links": { "type": "array", "items": { "$ref": "#/definitions/link" } },
+        "catalog": {
+          "type": "object",
+          "required": ["pool"],
+          "properties": {
+            "pool": { "type": "string" },
+            "reach": { "enum": ["any", "long"] },
+            "role_axis": { "type": "boolean" }
+          }
+        },
+        "baseline": {
+          "type": "object",
+          "required": ["rows", "source"],
+          "properties": {
+            "rows": { "type": ["integer", "null"], "minimum": 0 },
+            "source": { "type": "string" },
+            "note": { "type": "string" }
+          }
+        }
+      }
+    },
+    "field": {
+      "type": "object",
+      "required": ["name", "kind", "type", "form", "nullable", "expose"],
+      "properties": {
+        "name": { "type": "string" },
+        "kind": { "enum": ["field", "derived", "aggregate", "lifted", "const", "axis"] },
+        "src": { "type": "string" },
+        "fn": { "type": "string" },
+        "args": { "type": "array", "items": { "type": "string" } },
+        "value": { "type": "string" },
+        "type": { "enum": ["str", "int", "bool"] },
+        "form": { "enum": ["raw", "num_str", "enum_code", "enum_label", "pfx", "bits", "json_text"] },
+        "nullable": { "type": "boolean" },
+        "expose": { "type": "boolean" },
+        "variant": { "type": "string" },
+        "note": { "type": "string" },
+        "query": {
+          "type": "object",
+          "properties": {
+            "ops": {
+              "type": "array",
+              "items": { "enum": ["eq", "prefix", "tail", "contains", "range", "longest"] }
+            },
+            "index": { "type": "boolean" }
+          }
+        }
+      },
+      "allOf": [
+        { "if": { "properties": { "kind": { "enum": ["field", "lifted"] } } }, "then": { "required": ["src"] } },
+        { "if": { "properties": { "kind": { "enum": ["derived", "aggregate"] } } }, "then": { "required": ["fn"] } },
+        { "if": { "properties": { "kind": { "const": "const" } } }, "then": { "required": ["value"] } }
+      ]
+    },
+    "link": {
+      "type": "object",
+      "required": ["field", "to", "card", "key_expr", "on_missing", "critical"],
+      "properties": {
+        "field": { "type": "string" },
+        "to": { "type": "string" },
+        "card": { "enum": ["1:1", "1:n", "n:1"] },
+        "unique": { "type": "boolean" },
+        "key_expr": {
+          "type": "object",
+          "required": ["from", "to_key"],
+          "properties": {
+            "from": { "type": "string" },
+            "map": { "type": "string" },
+            "to_key": { "type": "string" }
+          }
+        },
+        "on_missing": { "enum": ["null", "dangling"] },
+        "critical": { "type": "boolean" },
+        "paging": {
+          "oneOf": [
+            { "type": "null" },
+            {
+              "type": "object",
+              "required": ["default", "max", "cursor"],
+              "properties": {
+                "default": { "type": "integer", "minimum": 1 },
+                "max": { "type": "integer", "minimum": 1 },
+                "cursor": { "const": "keyset" }
+              }
+            }
+          ]
+        }
+      }
+    },
+    "coverage": {
+      "type": "object",
+      "required": ["route", "needs", "status"],
+      "properties": {
+        "route": { "type": "string" },
+        "needs": { "type": "array", "items": { "type": "string" } },
+        "io": { "type": "array", "items": { "type": "string" } },
+        "status": { "enum": ["covered", "partial", "blocked", "legacy_only", "out_of_scope"] },
+        "note": { "type": "string" }
+      }
+    }
+  }
+}

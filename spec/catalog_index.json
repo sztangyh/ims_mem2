@@ -1,0 +1,283 @@
+{
+  "spec": "catalog_index",
+  "version": 2,
+  "date": "2026-11-14",
+  "note": "目录=全局键索引(物化)，供前缀/尾部命中 + 游标分页。v2：池与 io_spec.catalog.pool 一一对应；来源改成 (table,col,role) 三元组（v1 的 'DNC' 池来源是错的，DNC 没有 pfx）；去掉未定义的 role_scan；阈值改为引用 CNACLD.MINL/MAXL，不再写死 1~6 位。",
+  "pools": [
+    {
+      "pool": "prefix",
+      "io": [
+        "PrefixRoute"
+      ],
+      "desc": "字冠词池(called 字冠 / caller 甄别号 / transform 入字冠)，跨 ne 与角色去重；含变换后号码形态（决议 2026-11-15：目录=号码字面全集）",
+      "sources": [
+        {
+          "table": "CNACLD",
+          "col": "PFX",
+          "role": "called"
+        },
+        {
+          "table": "CLRDSN",
+          "col": "CLI",
+          "role": "caller"
+        },
+        {
+          "table": "TGLDIDX",
+          "col": "PFX",
+          "role": "transform"
+        }
+      ],
+      "role_axis": true,
+      "status": "ok"
+    },
+    {
+      "pool": "subscriber",
+      "io": [
+        "Subscriber"
+      ],
+      "desc": "用户号码池(PUI 原文 / nsn)",
+      "sources": [
+        {
+          "table": "ASBR",
+          "col": "PUI",
+          "role": "primary"
+        }
+      ],
+      "reach": "long",
+      "baseline_distinct": 673407,
+      "status": "ok"
+    },
+    {
+      "pool": "trunk",
+      "io": [
+        "Trunk"
+      ],
+      "desc": "中继群编号池(定义型 MOC 的 TG 并集)",
+      "sources": [
+        {
+          "table": "PRATG",
+          "col": "TG",
+          "role": "definer"
+        },
+        {
+          "table": "SIPTG",
+          "col": "TG",
+          "role": "definer"
+        },
+        {
+          "table": "N7TG",
+          "col": "TG",
+          "role": "definer"
+        }
+      ],
+      "dedupe": [
+        "ne",
+        "tg"
+      ],
+      "baseline_distinct": 4916,
+      "status": "ok"
+    },
+    {
+      "pool": "gateway",
+      "io": [
+        "Mgw"
+      ],
+      "desc": "媒体网关池",
+      "sources": [
+        {
+          "table": "mgw_ne",
+          "col": "mid",
+          "role": "primary"
+        }
+      ],
+      "status": "blocked",
+      "reason": "no_source: ims_mem2 无 MGW 数据源"
+    },
+    {
+      "pool": "ne",
+      "io": [
+        "Ne"
+      ],
+      "desc": "网元池(仅 AGCF)",
+      "sources": [
+        {
+          "table": "ne",
+          "col": "mename",
+          "role": "primary"
+        }
+      ],
+      "baseline_distinct": 6,
+      "status": "ok"
+    }
+  ],
+  "entry": {
+    "id": "(pool, key)",
+    "fields": {
+      "pool": "所属池",
+      "key": "键(字冠词串 / nsn / tg / mid / mename)",
+      "roles": "该键出现的角色集合(仅 prefix 池)",
+      "nes": "该键出现的网元列表",
+      "hit_count": "总命中行数(大池只给估算，避免 O(N))",
+      "display": "展示名(轻量投影：1~3 个字段)"
+    },
+    "display_fields": [
+      "display"
+    ],
+    "note": "目录条目 = IO 的轻量投影，不是独立对象；同一池一个 key 一条，跨 ne/角色去重"
+  },
+  "match": {
+    "prefix": {
+      "how": "池内有序数组二分",
+      "order": "key 字典序(keyset)",
+      "ops": [
+        "prefix"
+      ]
+    },
+    "longest": {
+      "how": "最长字冠命中(单键)",
+      "pools": [
+        "prefix"
+      ]
+    },
+    "tail": {
+      "how": "逆字节序二分(短号=完整号尾部)",
+      "pools": [
+        "subscriber"
+      ],
+      "note": "numtrace 现行语义：nsn 前缀 ∪ 尾部，不收中间子串"
+    },
+    "exact": {
+      "how": "键等值",
+      "pools": [
+        "prefix",
+        "subscriber",
+        "trunk",
+        "gateway",
+        "ne"
+      ]
+    },
+    "score": null,
+    "note": "v1 的 'num.rs 的 prefix/longest 二分' 是对实现的引用；这里改成对行为的描述 + 池归属"
+  },
+  "pagination": {
+    "method": "keyset 游标(不用 offset)",
+    "cursor": "(pool, key)",
+    "default": 50,
+    "max": 500,
+    "reason": "字冠 166,638 / PUI 673,407 量级，offset 无意义",
+    "scope": "仅目录查询（catalog）；object.get 与 link.expand 不分页"
+  },
+  "domain_rule": {
+    "short_cursor": "输入长度 < 该网元 CNACLD.MINL 的下界 → 仅在 prefix 池做前缀匹配",
+    "long_reach": "达到号码长度 → 追加 subscriber 池(前缀 ∪ 尾部)",
+    "explicit_pool": "客户端可显式指定 pool，覆盖自动规则",
+    "threshold_source": "CNACLD.MINL / MAXL（不写死数字；v1 的 '1~6 位' 已废弃）",
+    "reason": "短字冠避免被用户号码占满候选"
+  },
+  "cache": {
+    "identity": "(pool, key) —— 是对象身份，跨批次稳定",
+    "version": "batch 批次号 —— 是内容版本/失效戳",
+    "client_entry": "(batch, payload)",
+    "invalidation": "请求带当前 batch，与缓存不一致则重拉；导入新批次整体失效",
+    "note": "身份与版本正交：key 保证是谁，batch 保证是不是当前那版"
+  },
+  "dangling": {
+    "hook": "逐链接声明，见 io_spec.links[].on_missing（'null' | 'dangling'）",
+    "critical": "critical=true 的链接（关键链段：落地中继 / MGW）必须显式 resolved:false + reason",
+    "default": "普通链接字段悬空 → null",
+    "reason": "防把『没查到』误判成『确实没有』"
+  },
+  "link_expand": {
+    "mode": "逐跳(逐步展开)",
+    "each_hop": "独立请求，可组合/可缓存/可停在任何一跳",
+    "pagination": "**链接展开不分页**（前进方向扇出极小）；分页只用于目录查询",
+    "fanout_evidence": {
+      "rsc→r": 2,
+      "r→sr": 1,
+      "sr→srtattr": 3,
+      "sr→psr": 3,
+      "src→tg": 1,
+      "cli→pfx": 994
+    },
+    "note": "反方向的\"一条 tg 承载 7,609 条路由\"=后备/公共中继的入度，不是查询方向；若将来要提供反查（如\"哪些路由以该中继为后备\"），另立服务并单独定义分页",
+    "chain": "PrefixRoute.chain → Rtana → Rt → Srt → Tgsrt → Trunk"
+  },
+  "materialization": {
+    "default": "none —— 查询时直接扫 Library（D62）",
+    "evidence_ms": {
+      "subscriber_prefix_raw": 76,
+      "subscriber_prefix_derived_nsn": 449,
+      "prefix_pool_full_scan": 24,
+      "trunk_exact": 0.17
+    },
+    "optional_index": {
+      "when": "仅当某池实测 >100 ms 且不可优化时",
+      "what": "有序键数组 + roles/nes 位掩码（不存 Entry 对象）",
+      "cost_estimate_mb": 12
+    }
+  },
+  "memory_budget": {
+    "rule": "索引体积必须远小于正文（D63/D63a）",
+    "library_mb": 133.0,
+    "max_bytes_per_key": 40,
+    "max_pct_of_library": 10,
+    "structure": "行号排列数组 u32（4 B/行）+ 来源类型位掩码（1 B/键）；不复制键字符串",
+    "source_order_evidence": [
+      {
+        "table": "ASBR",
+        "col": "PUI",
+        "rows": 673407,
+        "ascending_pct": 99.9
+      },
+      {
+        "table": "CNACLD",
+        "col": "PFX",
+        "rows": 79669,
+        "ascending_pct": 100.0
+      },
+      {
+        "table": "CLRDSN",
+        "col": "CLI",
+        "rows": 26875,
+        "ascending_pct": 95.9
+      },
+      {
+        "table": "TGLDIDX",
+        "col": "PFX",
+        "rows": 5190,
+        "ascending_pct": 97.0
+      },
+      {
+        "table": "PRATG",
+        "col": "TG",
+        "rows": 4376,
+        "ascending_pct": 99.3
+      },
+      {
+        "table": "SIPTG",
+        "col": "TG",
+        "rows": 511,
+        "ascending_pct": 99.8
+      },
+      {
+        "table": "N7TG",
+        "col": "TG",
+        "rows": 29,
+        "ascending_pct": 100.0
+      }
+    ],
+    "what_needs_index": {
+      "prefix": "必须 —— 字冠分散在 CNACLD/CLRDSN/TGLDIDX 三个 MOC，需聚合且带来源类型",
+      "subscriber": "不必（源行 99.9% 已有序）；要 <5 ms 才建 2.6 MB 排列数组（尾号另需逆序排列 +2.6 MB）",
+      "trunk": "不必 —— 三表各自有序、2,002 键，归并即可"
+    },
+    "predicted_index_mb": {
+      "prefix": 0.5,
+      "subscriber": 2.6,
+      "trunk": 0.02,
+      "total": 3.1
+    },
+    "predicted_pct_of_library": 2.3,
+    "known_bug": "旧 io_catalog：+304 MB（229% 正文 / 622 B/键）—— 每键 4 个堆容器"
+  }
+}

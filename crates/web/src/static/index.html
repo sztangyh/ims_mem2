@@ -1,0 +1,71 @@
+<!doctype html>
+<html lang="zh-CN">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>IMS 内存库 · 号码 / 用户 / 中继 / 网元</title>
+<script>
+/* 主题早期应用（防闪白）：localStorage 优先，其次跟随系统 */
+(function () {
+  var t = null;
+  try { t = localStorage.getItem('ims.theme'); } catch (e) {}
+  if (t !== 'dark' && t !== 'light')
+    t = matchMedia('(prefers-color-scheme: dark)').matches ? 'dark' : 'light';
+  document.documentElement.dataset.theme = t;
+})();
+</script>
+<link rel="stylesheet" href="/style.css">
+</head>
+<body>
+<div class="app">
+  <!-- ================= 侧栏 ================= -->
+  <aside class="side">
+    <a class="brand" href="#/search">
+      <div class="logo">号</div>
+      <div class="brand-txt">
+        <h1>IMS 内存库</h1>
+        <span>AGCF · MGW 查询台</span>
+      </div>
+    </a>
+
+    <nav class="nav">
+      <a href="#/search" data-nav="search"><i>⌕</i><span>查询</span><kbd>/</kbd></a>
+      <a href="#/history" data-nav="history"><i>◷</i><span>历史</span><b id="hist-count"></b></a>
+      <a href="#/help" data-nav="help"><i>?</i><span>说明</span></a>
+    </nav>
+
+    <div class="side-sec">
+      <div class="side-head">
+        <span>最近浏览</span>
+        <button class="mini" id="clear-hist" title="清空历史">清空</button>
+      </div>
+      <ul class="hist" id="hist-list"></ul>
+    </div>
+
+    <div class="side-foot">
+      <div class="status" id="svc-status"><i class="dot"></i><span>连接中…</span></div>
+      <div class="foot-row">
+        <button class="mini" id="clear-cache" title="清空本地缓存">清缓存</button>
+        <button class="mini" id="theme-btn" title="切换深色 / 浅色">主题</button>
+      </div>
+    </div>
+  </aside>
+
+  <!-- ================= 主区 ================= -->
+  <main class="main">
+    <div class="viewport" id="view"></div>
+  </main>
+</div>
+
+<!-- 命令面板 -->
+<div class="palette-wrap" id="palette" hidden>
+  <div class="palette">
+    <input id="palette-input" placeholder="搜索…  字冠 / 用户号码 / 中继 / 网元" autocomplete="off">
+    <div class="palette-hint"><kbd>Enter</kbd> 查询 · <kbd>Esc</kbd> 关闭</div>
+  </div>
+</div>
+
+<div class="toast-wrap" id="toast"></div>
+<script src="/app.js"></script>
+</body>
+</html>

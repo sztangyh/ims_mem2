@@ -1,0 +1,13 @@
+[package]
+name = "ims_tui"
+version = "0.1.0"
+edition = "2021"
+
+[[bin]]
+name = "ims_tui"
+path = "src/main.rs"
+
+[dependencies]
+ratatui = "0.30"
+serde_json = "1"
+ims_mem2 = { path = "../core" }

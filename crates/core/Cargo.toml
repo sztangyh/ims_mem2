@@ -1,0 +1,16 @@
+[package]
+name = "ims_mem2"
+version = "0.1.0"
+edition = "2021"
+description = "AGCF 后备全内存结构化存储（B 方案：内存为唯一真源 + SCD2 版本链 + 引用图）"
+license = "MIT"
+
+[dependencies]
+# `mml_table!`：瘦声明 → Row/Pending/ColStore/TableHooks
+ims_mem2_macros = { path = "../macros" }
+# GBK 懒转码（只在导出/报告时使用）
+encoding_rs = "0.8"
+# UDP 线上的真 AEAD（XChaCha20-Poly1305：24 字节随机 nonce，不用自己管 nonce 唯一性）
+chacha20poly1305 = "0.10"
+# nonce / seq 起始值用 OS 随机
+getrandom = "0.2"

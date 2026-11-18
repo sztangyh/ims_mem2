@@ -1,0 +1,13 @@
+[package]
+name = "ims_web"
+version = "0.1.0"
+edition = "2021"
+
+[[bin]]
+name = "ims_web"
+path = "src/main.rs"
+
+# 零第三方依赖：HTTP 转发层用纯 std（回环 TCP 复用连接 + 极简 HTTP GET 服务器），
+# 静态前端用 include_str! 内嵌，避免任何 cargo 网络拉取。
+[dependencies]
+ims_mem2 = { path = "../core" }

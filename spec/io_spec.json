@@ -1,0 +1,3267 @@
+{
+ "spec": "io_spec",
+ "version": 2,
+ "date": "2026-11-14",
+ "note": "服务层中间对象(IO)定义 v2。相比 v1：补齐字段绑定(src/fn/type/form)、链接可执行表达式、粒度与去重语义(grain/collapse)、9 个缺失的链接目标(5 个新 IO + 4 个 chain 子步)、coverage 覆盖矩阵与 functions 注册表。校验器见 tools/check_io_spec.py，结构定义见 io_spec.schema.json。 ｜ 分页口径（2026-11-14 领域裁定）：**分页只用于目录查询**；链接展开不分页（前进方向实测扇出 ≤3：rsc→r 2、r→sr 1、sr→srtattr 3、src→tg 1；唯一大扇出是变换索引 cli→pfx 994，属变换查询而非选路）。",
+ "schema": "io_spec.schema.json",
+ "field_kinds": {
+  "field": "某个 MOC 的某列(直取)。必须给 src",
+  "derived": "由若干列算出。必须给 fn",
+  "aggregate": "一个实例聚合多行/多参数。必须给 fn",
+  "lifted": "提升列缺省值(A4 defaults.tsv)。必须给 src + kind=lifted",
+  "const": "固定字面量。必须给 value",
+  "axis": "IO 的内部维度(不是数据列)，如 PrefixRoute.role"
+ },
+ "field_types": [
+  "str",
+  "int",
+  "bool"
+ ],
+ "field_forms": {
+  "raw": "原样字符串",
+  "num_str": "数值转十进制字符串",
+  "enum_code": "枚举码(SQLite 侧存数字码；7 列 + trunk CSF/CDFP)",
+  "enum_label": "枚举标签词",
+  "pfx": "字冠:去 K'、字母/# 原样",
+  "bits": "f:{位图十进制}",
+  "json_text": "紧凑 JSON 数组文本(perc/kc)"
+ },
+ "cardinality": {
+  "1:1": "单实例→单目标",
+  "n:1": "多实例→单目标",
+  "1:n": "单实例→多目标"
+ },
+ "functions": {
+  "fn:asbr.nsn": {
+   "in": "PUI(uri)",
+   "out": "str",
+   "impl": "ims_mem/src/bridge.rs:731-760",
+   "note": "sip:+86<11位>@域→11位本地号；否则去引号去 sip:"
+  },
+  "fn:asbr.scc": {
+   "in": "PUI",
+   "out": "str('1'|'0')",
+   "impl": "ims_mem/src/bridge.rs:707-730",
+   "note": "PUI ∈ SRVRGT.IMPU 集合；实现口径 = ASBR.SN 非空（SRVRGT 已并入 ASBR，P7；实测 48,614 行）"
+  },
+  "fn:asbr.trunk_ref": {
+   "in": "DID,EID,TID,ISDN,TRUNKGP,V5IID",
+   "out": "str",
+   "impl": "ims_mem/src/bridge.rs:505-558",
+   "note": "按 DID 三形态取其一"
+  },
+  "fn:trunk.tg_type": {
+   "in": "定义型 MOC 命中集",
+   "out": "str",
+   "impl": "ims_mem/src/bridge.rs:1261-1269",
+   "note": "字典序最小 → PRA/BRA/H323/R2/No7/SIP"
+  },
+  "fn:trunk.direction": {
+   "in": "GD|G",
+   "out": "str",
+   "impl": "ims_mem/src/bridge.rs:1270-1300",
+   "note": "TIN→IN/TOUT→OUT/TINOUT→INOUT，默认 INOUT"
+  },
+  "fn:trunk.tgn": {
+   "in": "10×键值集",
+   "out": "str",
+   "impl": "ims_mem/src/bridge.rs:1300-1330",
+   "note": "同群取字典序最小"
+  },
+  "fn:trunk.src": {
+   "in": "TGAP/TGDSG 命中",
+   "out": "str",
+   "impl": "ims_mem/src/bridge.rs:1330-1345",
+   "note": "位掩码 1|2"
+  },
+  "fn:rt.perc": {
+   "in": "PERCCFG,PERC1..32",
+   "out": "str(json)",
+   "impl": "ims_mem/src/bridge.rs:678-706",
+   "note": "perccfg=YES 才输出"
+  },
+  "fn:n7tg.kc": {
+   "in": "N7TKC 行集(按 TG)",
+   "out": "str(json)",
+   "impl": "ims_mem/src/bridge.rs:853-928",
+   "note": "32 条一段"
+  },
+  "fn:prefix.cost": {
+   "in": "SRTCOST.CST",
+   "out": "str",
+   "impl": "numtrace/src/trace.rs:288-381",
+   "note": "同 (ne,lp,pfx,sr) 归一化"
+  },
+  "fn:prefix.transform_rule": {
+   "in": "TGLDIDX(bpn/ei/ori/rdi/ri),DNC(dct/dcp/dcl)",
+   "out": "str",
+   "impl": "numtrace/src/search.rs:1031-1145",
+   "note": "补齐/删/还原"
+  },
+  "fn:clrdsn.members": {
+   "in": "CLRDSN.CLI 行集(按 dsp)",
+   "out": "str",
+   "impl": "numtrace/src/search.rs:428-438",
+   "note": "组内 cli 条数(去重)"
+  },
+  "fn:ne.table_row_counts": {
+   "in": "各 MOC 行数",
+   "out": "str(json)",
+   "impl": "ims_mem2(待实现)",
+   "note": "每 MOC 行数 + 首末批次"
+  },
+  "fn:mgw.link_counts": {
+   "in": "mgw_* 表行数",
+   "out": "str(json)",
+   "impl": "blocked: 无 MGW 数据源",
+   "note": ""
+  }
+ },
+ "io": [
+  {
+   "name": "Subscriber",
+   "summary": "用户(号码)。对外键 nsn，内部定位 (ne,pui)。ASBR 按 DID 三形态 + SRVRGT 注册标志。",
+   "scope": {
+    "ne_types": [
+     "AGCF"
+    ],
+    "status": "ok",
+    "m1": "passed"
+   },
+   "grain": {
+    "key": [
+     "ne",
+     "pui"
+    ],
+    "from_rows": "one",
+    "collapse": null
+   },
+   "variants": [
+    {
+     "when": {
+      "did": [
+       "ESL"
+      ]
+     },
+     "fields": [
+      "eid",
+      "tid"
+     ]
+    },
+    {
+     "when": {
+      "did": [
+       "PRA",
+       "ISUP",
+       "TUP",
+       "SIPPBX"
+      ]
+     },
+     "fields": [
+      "isdn",
+      "tg"
+     ]
+    },
+    {
+     "when": {
+      "did": [
+       "V5ST"
+      ]
+     },
+     "fields": [
+      "v5iid"
+     ]
+    }
+   ],
+   "source": [
+    {
+     "table": "ASBR",
+     "moc": "ASBR",
+     "role": "primary"
+    },
+    {
+     "table": "SRVRGT",
+     "moc": "SRVRGT",
+     "role": "member",
+     "note": "并入 ASBR(P7)，只用于 scc"
+    }
+   ],
+   "fields": [
+    {
+     "name": "nsn",
+     "kind": "derived",
+     "fn": "fn:asbr.nsn",
+     "args": [
+      "ASBR.PUI"
+     ],
+     "type": "str",
+     "form": "raw",
+     "nullable": false,
+     "expose": true,
+     "query": {
+      "ops": [
+       "eq",
+       "prefix",
+       "tail"
+      ],
+      "index": true
+     }
+    },
+    {
+     "name": "did",
+     "kind": "field",
+     "src": "ASBR.DID",
+     "type": "str",
+     "form": "raw",
+     "nullable": true,
+     "expose": true,
+     "query": {
+      "ops": [
+       "eq"
+      ],
+      "index": false
+     }
+    },
+    {
+     "name": "mn",
+     "kind": "field",
+     "src": "ASBR.MN",
+     "type": "str",
+     "form": "raw",
+     "nullable": true,
+     "expose": true
+    },
+    {
+     "name": "eid",
+     "kind": "field",
+     "src": "ASBR.EID",
+     "type": "str",
+     "form": "raw",
+     "nullable": true,
+     "expose": true,
+     "variant": "ESL"
+    },
+    {
+     "name": "tid",
+     "kind": "field",
+     "src": "ASBR.TID",
+     "type": "str",
+     "form": "raw",
+     "nullable": true,
+     "expose": true,
+     "variant": "ESL"
+    },
+    {
+     "name": "isdn",
+     "kind": "field",
+     "src": "ASBR.ISDN",
+     "type": "str",
+     "form": "raw",
+     "nullable": true,
+     "expose": true,
+     "variant": "PRA"
+    },
+    {
+     "name": "tg",
+     "kind": "field",
+     "src": "ASBR.TRUNKGP",
+     "type": "str",
+     "form": "raw",
+     "nullable": true,
+     "expose": true,
+     "variant": "PRA",
+     "note": "源参数名 ≠ 目标列名"
+    },
+    {
+     "name": "v5iid",
+     "kind": "field",
+     "src": "ASBR.V5IID",
+     "type": "str",
+     "form": "raw",
+     "nullable": true,
+     "expose": true,
+     "variant": "V5"
+    },
+    {
+     "name": "l3addr",
+     "kind": "field",
+     "src": "ASBR.L3ADDR",
+     "type": "str",
+     "form": "raw",
+     "nullable": true,
+     "expose": true
+    },
+    {
+     "name": "scc",
+     "kind": "derived",
+     "fn": "fn:asbr.scc",
+     "args": [
+      "ASBR.PUI"
+     ],
+     "type": "str",
+     "form": "raw",
+     "nullable": false,
+     "expose": true,
+     "note": "注册标志；口径 = ASBR.SN 非空（SRVRGT 并入 ASBR）"
+    },
+    {
+     "name": "netid",
+     "kind": "lifted",
+     "src": "ASBR.NETID",
+     "type": "str",
+     "form": "raw",
+     "nullable": true,
+     "expose": false
+    },
+    {
+     "name": "netinfo",
+     "kind": "lifted",
+     "src": "ASBR.NETINFO",
+     "type": "str",
+     "form": "raw",
+     "nullable": true,
+     "expose": false
+    },
+    {
+     "name": "pwd",
+     "kind": "field",
+     "src": "ASBR.PWD",
+     "type": "str",
+     "form": "raw",
+     "nullable": true,
+     "expose": false,
+     "note": "敏感，默认不暴露"
+    },
+    {
+     "name": "pui",
+     "kind": "field",
+     "src": "ASBR.PUI",
+     "type": "str",
+     "form": "raw",
+     "nullable": false,
+     "expose": false,
+     "note": "内部键(URI 原文)；对外用 nsn"
+    }
+   ],
+   "links": [
+    {
+     "field": "trunk",
+     "to": "Trunk",
+     "card": "n:1",
+     "unique": true,
+     "key_expr": {
+      "from": "ASBR.TRUNKGP",
+      "map": "tg_norm",
+      "to_key": "tg"
+     },
+     "on_missing": "dangling",
+     "critical": true,
+     "paging": null
+    },
+    {
+     "field": "mgw",
+     "to": "Mgw",
+     "card": "n:1",
+     "unique": true,
+     "key_expr": {
+      "from": "ASBR.MGW",
+      "map": "ip_port_to_mid",
+      "to_key": "mid"
+     },
+     "on_missing": "dangling",
+     "critical": true,
+     "paging": null
+    },
+    {
+     "field": "v5i",
+     "to": "V5Access",
+     "card": "1:1",
+     "unique": true,
+     "key_expr": {
+      "from": "ASBR.V5IID",
+      "to_key": "v5iid"
+     },
+     "on_missing": "null",
+     "critical": false,
+     "paging": null
+    }
+   ],
+   "catalog": {
+    "pool": "subscriber",
+    "reach": "long"
+   },
+   "baseline": {
+    "rows": 673407,
+    "source": "bridge_asbr_mgw+bridge_asbr_trunk+bridge_asbr_v5",
+    "note": "三张 asbr 分表合计 673,407（mgw 368,760 + trunk 235,414 + v5 69,233）；按 DID 分流不合并；scc=1 共 48,614 行"
+   }
+  },
+  {
+   "name": "Trunk",
+   "summary": "中继群。主键 (ne,tg)：7 定义型 MOC 的 TG 并集 + 携带者收集。",
+   "scope": {
+    "ne_types": [
+     "AGCF"
+    ],
+    "status": "ok",
+    "m1": "passed"
+   },
+   "grain": {
+    "key": [
+     "ne",
+     "tg"
+    ],
+    "from_rows": "many",
+    "collapse": {
+     "field": "tg",
+     "by": "union",
+     "over": [
+      "PRATG",
+      "SIPTG",
+      "N7TG",
+      "V5TG",
+      "V5I",
+      "V5TKC",
+      "PRATKC",
+      "TGDSG",
+      "TGAP"
+     ]
+    }
+   },
+   "variants": [],
+   "source": [
+    {
+     "table": "PRATG",
+     "moc": "PRATG",
+     "role": "definer",
+     "tg_type": "PRA",
+     "direction_param": "GD"
+    },
+    {
+     "table": "SIPTG",
+     "moc": "SIPTG",
+     "role": "definer",
+     "tg_type": "SIP",
+     "direction_param": null
+    },
+    {
+     "table": "N7TG",
+     "moc": "N7TG",
+     "role": "definer",
+     "tg_type": "No7",
+     "direction_param": "G"
+    },
+    {
+     "table": "APRATG",
+     "moc": "APRATG",
+     "role": "definer",
+     "tg_type": "PRA",
+     "direction_param": "GD"
+    },
+    {
+     "table": "BRATG",
+     "moc": "BRATG",
+     "role": "definer",
+     "tg_type": "BRA",
+     "direction_param": null
+    },
+    {
+     "table": "H323TG",
+     "moc": "H323TG",
+     "role": "definer",
+     "tg_type": "H323",
+     "direction_param": "GD"
+    },
+    {
+     "table": "N1TG",
+     "moc": "N1TG",
+     "role": "definer",
+     "tg_type": "R2",
+     "direction_param": "G"
+    },
+    {
+     "table": "PRATKC",
+     "moc": "PRATKC",
+     "role": "carrier"
+    },
+    {
+     "table": "TGDSG",
+     "moc": "TGDSG",
+     "role": "carrier"
+    },
+    {
+     "table": "TGAP",
+     "moc": "TGAP",
+     "role": "carrier_member"
+    },
+    {
+     "table": "TGSRT",
+     "moc": "TGSRT",
+     "role": "carrier"
+    },
+    {
+     "table": "SIPIPPAIR",
+     "moc": "SIPIPPAIR",
+     "role": "carrier"
+    },
+    {
+     "table": "V5TG",
+     "moc": "V5TG",
+     "role": "carrier_v5",
+     "key_col": "TGID"
+    },
+    {
+     "table": "V5I",
+     "moc": "V5I",
+     "role": "carrier_v5",
+     "key_col": "TGID"
+    },
+    {
+     "table": "V5TKC",
+     "moc": "V5TKC",
+     "role": "carrier_v5",
+     "key_col": "TGID"
+    }
+   ],
+   "fields": [
+    {
+     "name": "tg",
+     "kind": "field",
+     "src": "PRATG.TG",
+     "type": "str",
+     "form": "raw",
+     "nullable": false,
+     "expose": true,
+     "query": {
+      "ops": [
+       "eq",
+       "prefix"
+      ],
+      "index": true
+     }
+    },
+    {
+     "name": "tg_type",
+     "kind": "derived",
+     "fn": "fn:trunk.tg_type",
+     "type": "str",
+     "form": "raw",
+     "nullable": false,
+     "expose": true
+    },
+    {
+     "name": "direction",
+     "kind": "derived",
+     "fn": "fn:trunk.direction",
+     "type": "str",
+     "form": "raw",
+     "nullable": false,
+     "expose": true
+    },
+    {
+     "name": "tgn",
+     "kind": "aggregate",
+     "fn": "fn:trunk.tgn",
+     "args": [
+      "PRATG.TG",
+      "PRATKC.TG",
+      "TGDSG.TG",
+      "TGSRT.TG",
+      "SIPTG.TG",
+      "SIPIPPAIR.TG",
+      "N7TG.TG",
+      "V5TG.TGID",
+      "V5I.TGID",
+      "V5TKC.TGID"
+     ],
+     "type": "str",
+     "form": "raw",
+     "nullable": true,
+     "expose": true
+    },
+    {
+     "name": "dsg",
+     "kind": "field",
+     "src": "TGDSG.DSG",
+     "type": "str",
+     "form": "raw",
+     "nullable": true,
+     "expose": true
+    },
+    {
+     "name": "src",
+     "kind": "derived",
+     "fn": "fn:trunk.src",
+     "type": "str",
+     "form": "num_str",
+     "nullable": true,
+     "expose": true
+    },
+    {
+     "name": "csf",
+     "kind": "field",
+     "src": "TGAP.CSF",
+     "type": "str",
+     "form": "enum_code",
+     "nullable": true,
+     "expose": true
+    },
+    {
+     "name": "cdfp",
+     "kind": "field",
+     "src": "TGAP.CDFP",
+     "type": "str",
+     "form": "enum_code",
+     "nullable": true,
+     "expose": true
+    },
+    {
+     "name": "spfunc",
+     "kind": "field",
+     "src": "TGAP.SPFUNC",
+     "type": "str",
+     "form": "bits",
+     "nullable": true,
+     "expose": true
+    },
+    {
+     "name": "name",
+     "kind": "field",
+     "src": "TGAP.NAME",
+     "type": "str",
+     "form": "raw",
+     "nullable": true,
+     "expose": true
+    },
+    {
+     "name": "asvrcf",
+     "kind": "field",
+     "src": "TGAP.ASVRCF",
+     "type": "str",
+     "form": "bits",
+     "nullable": true,
+     "expose": false
+    }
+   ],
+   "links": [
+    {
+     "field": "serving_mgw",
+     "to": "Mgw",
+     "card": "n:1",
+     "unique": true,
+     "key_expr": {
+      "from": "PRATG.MGW",
+      "map": "ip_port_to_mid",
+      "to_key": "mid"
+     },
+     "on_missing": "dangling",
+     "critical": true,
+     "paging": null
+    },
+    {
+     "field": "pra_link",
+     "to": "PraLink",
+     "card": "1:1",
+     "unique": true,
+     "key_expr": {
+      "from": "PRATG.BINIFID",
+      "to_key": "binifid"
+     },
+     "on_missing": "dangling",
+     "critical": true,
+     "paging": null
+    },
+    {
+     "field": "routes",
+     "to": "PrefixRoute",
+     "card": "1:n",
+     "unique": false,
+     "key_expr": {
+      "from": "TG",
+      "map": "tg_to_prefix",
+      "to_key": "key"
+     },
+     "on_missing": "null",
+     "critical": false,
+     "paging": null
+    },
+    {
+     "field": "clrdsn",
+     "to": "ClrdsnGroup",
+     "card": "1:n",
+     "unique": false,
+     "key_expr": {
+      "from": "DSG",
+      "to_key": "dsp"
+     },
+     "on_missing": "null",
+     "critical": false,
+     "paging": null
+    }
+   ],
+   "catalog": {
+    "pool": "trunk",
+    "reach": "any"
+   },
+   "baseline": {
+    "rows": 4916,
+    "source": "bridge_trunk",
+    "note": "per (ne,tg)；同 tg 跨网元重复 2914 次，不得合并"
+   }
+  },
+  {
+   "name": "PrefixRoute",
+   "summary": "字冠路由。一个 IO 扛 called/caller/transform 三角色；键含 role 与 scope。",
+   "scope": {
+    "ne_types": [
+     "AGCF"
+    ],
+    "status": "ok",
+    "m1": "todo"
+   },
+   "grain": {
+    "key": [
+     "ne",
+     "role",
+     "scope",
+     "key"
+    ],
+    "from_rows": "one",
+    "collapse": null,
+    "note": "scope=lp(called)|dsp(caller)|cli(transform)；key=pfx 或 cli"
+   },
+   "variants": [],
+   "role_axis": {
+    "role": [
+     "called",
+     "caller",
+     "transform"
+    ]
+   },
+   "source": [
+    {
+     "table": "CNACLD",
+     "moc": "CNACLD",
+     "role": "called"
+    },
+    {
+     "table": "RTANA",
+     "moc": "RTANA",
+     "role": "called_chain"
+    },
+    {
+     "table": "SRTCOST",
+     "moc": "SRTCOST",
+     "role": "called_cost"
+    },
+    {
+     "table": "OFC",
+     "moc": "OFC",
+     "role": "called_out"
+    },
+    {
+     "table": "CLRDSN",
+     "moc": "CLRDSN",
+     "role": "caller"
+    },
+    {
+     "table": "TGLDIDX",
+     "moc": "TGLDIDX",
+     "role": "transform"
+    }
+   ],
+   "fields": [
+    {
+     "name": "key",
+     "kind": "field",
+     "src": "CNACLD.PFX",
+     "type": "str",
+     "form": "pfx",
+     "nullable": false,
+     "expose": true,
+     "query": {
+      "ops": [
+       "eq",
+       "prefix",
+       "longest"
+      ],
+      "index": true
+     }
+    },
+    {
+     "name": "scope",
+     "kind": "field",
+     "src": "CNACLD.LP",
+     "type": "str",
+     "form": "raw",
+     "nullable": false,
+     "expose": false,
+     "note": "called 用 LP，caller 用 DSP"
+    },
+    {
+     "name": "role",
+     "kind": "axis",
+     "type": "str",
+     "form": "raw",
+     "nullable": false,
+     "expose": true
+    },
+    {
+     "name": "rsc",
+     "kind": "field",
+     "src": "CNACLD.RSC",
+     "type": "str",
+     "form": "num_str",
+     "nullable": true,
+     "expose": true
+    },
+    {
+     "name": "minl",
+     "kind": "field",
+     "src": "CNACLD.MINL",
+     "type": "str",
+     "form": "num_str",
+     "nullable": true,
+     "expose": true
+    },
+    {
+     "name": "maxl",
+     "kind": "field",
+     "src": "CNACLD.MAXL",
+     "type": "str",
+     "form": "num_str",
+     "nullable": true,
+     "expose": true
+    },
+    {
+     "name": "cost",
+     "kind": "aggregate",
+     "fn": "fn:prefix.cost",
+     "args": [
+      "SRTCOST.CST"
+     ],
+     "type": "str",
+     "form": "num_str",
+     "nullable": true,
+     "expose": true
+    },
+    {
+     "name": "dol",
+     "kind": "field",
+     "src": "OFC.DOL",
+     "type": "str",
+     "form": "raw",
+     "nullable": true,
+     "expose": true
+    },
+    {
+     "name": "cli",
+     "kind": "field",
+     "src": "CLRDSN.CLI",
+     "type": "str",
+     "form": "pfx",
+     "nullable": true,
+     "expose": true,
+     "variant": "caller"
+    },
+    {
+     "name": "transform_rule",
+     "kind": "derived",
+     "fn": "fn:prefix.transform_rule",
+     "type": "str",
+     "form": "raw",
+     "nullable": true,
+     "expose": true,
+     "variant": "transform"
+    }
+   ],
+   "links": [
+    {
+     "field": "chain",
+     "to": "Rtana",
+     "card": "1:n",
+     "unique": false,
+     "key_expr": {
+      "from": "CNACLD.RSC",
+      "to_key": "rsc"
+     },
+     "on_missing": "dangling",
+     "critical": true,
+     "paging": null
+    },
+    {
+     "field": "trunk",
+     "to": "Trunk",
+     "card": "1:n",
+     "unique": false,
+     "key_expr": {
+      "from": "SRT/TGSRT",
+      "map": "via_tgsrt",
+      "to_key": "tg"
+     },
+     "on_missing": "null",
+     "critical": false,
+     "paging": null
+    },
+    {
+     "field": "dng",
+     "to": "Transform",
+     "card": "n:1",
+     "unique": true,
+     "key_expr": {
+      "from": "CLRDSN.RDCX",
+      "to_key": "cli"
+     },
+     "on_missing": "dangling",
+     "critical": false,
+     "paging": null
+    }
+   ],
+   "catalog": {
+    "pool": "prefix",
+    "reach": "any",
+    "role_axis": true
+   },
+   "baseline": {
+    "rows": 79669,
+    "source": "bridge_cnacld",
+    "note": "role=called 的对象数；caller/transform 各另有对象"
+   }
+  },
+  {
+   "name": "Rtana",
+   "summary": "路由分析(RSC 维度)。一个 RSC 对应多 R 是正常形态，不去重。",
+   "scope": {
+    "ne_types": [
+     "AGCF"
+    ],
+    "status": "ok",
+    "m1": "passed"
+   },
+   "grain": {
+    "key": [
+     "ne",
+     "rsc"
+    ],
+    "from_rows": "many",
+    "collapse": {
+     "field": "rsc",
+     "by": "all"
+    },
+    "note": "一键多行是契约(R8)"
+   },
+   "variants": [],
+   "source": [
+    {
+     "table": "RTANA",
+     "moc": "RTANA",
+     "role": "primary"
+    }
+   ],
+   "fields": [
+    {
+     "name": "rsc",
+     "kind": "field",
+     "src": "RTANA.RSC",
+     "type": "str",
+     "form": "num_str",
+     "nullable": false,
+     "expose": true,
+     "query": {
+      "ops": [
+       "eq"
+      ],
+      "index": true
+     }
+    },
+    {
+     "name": "rssc",
+     "kind": "field",
+     "src": "RTANA.RSSC",
+     "type": "str",
+     "form": "raw",
+     "nullable": true,
+     "expose": true
+    },
+    {
+     "name": "ran",
+     "kind": "field",
+     "src": "RTANA.RAN",
+     "type": "str",
+     "form": "raw",
+     "nullable": true,
+     "expose": true
+    },
+    {
+     "name": "r",
+     "kind": "field",
+     "src": "RTANA.R",
+     "type": "str",
+     "form": "num_str",
+     "nullable": true,
+     "expose": true
+    }
+   ],
+   "links": [
+    {
+     "field": "rt",
+     "to": "Rt",
+     "card": "1:n",
+     "unique": false,
+     "key_expr": {
+      "from": "RTANA.R",
+      "to_key": "r"
+     },
+     "on_missing": "dangling",
+     "critical": true,
+     "paging": null
+    }
+   ],
+   "baseline": {
+    "rows": 1924,
+    "source": "bridge_rtana",
+    "note": "1,924 行 / 1,914 个唯一 (ne,rsc,r)（多行是契约 R8，不去重）"
+   }
+  },
+  {
+   "name": "Rt",
+   "summary": "路由(R 维度)。perc 是 32 个 PERC 参数拼成的 JSON 文本。",
+   "scope": {
+    "ne_types": [
+     "AGCF"
+    ],
+    "status": "ok",
+    "m1": "passed"
+   },
+   "grain": {
+    "key": [
+     "ne",
+     "r"
+    ],
+    "from_rows": "one",
+    "collapse": null
+   },
+   "variants": [],
+   "source": [
+    {
+     "table": "RT",
+     "moc": "RT",
+     "role": "primary"
+    }
+   ],
+   "fields": [
+    {
+     "name": "r",
+     "kind": "field",
+     "src": "RT.R",
+     "type": "str",
+     "form": "num_str",
+     "nullable": false,
+     "expose": true,
+     "query": {
+      "ops": [
+       "eq"
+      ],
+      "index": true
+     }
+    },
+    {
+     "name": "perc",
+     "kind": "aggregate",
+     "fn": "fn:rt.perc",
+     "args": [
+      "RT.PERCCFG",
+      "RT.PERC1..32"
+     ],
+     "type": "str",
+     "form": "json_text",
+     "nullable": true,
+     "expose": true
+    },
+    {
+     "name": "perccfg",
+     "kind": "field",
+     "src": "RT.PERCCFG",
+     "type": "str",
+     "form": "enum_label",
+     "nullable": true,
+     "expose": true,
+     "note": "Bool 原词法 YES/NO（内存存 1/0，投影还原成词）"
+    },
+    {
+     "name": "rn",
+     "kind": "field",
+     "src": "RT.RN",
+     "type": "str",
+     "form": "raw",
+     "nullable": true,
+     "expose": true
+    },
+    {
+     "name": "srst",
+     "kind": "field",
+     "src": "RT.SRST",
+     "type": "str",
+     "form": "raw",
+     "nullable": true,
+     "expose": true
+    }
+   ],
+   "links": [
+    {
+     "field": "srt",
+     "to": "Srt",
+     "card": "1:n",
+     "unique": false,
+     "key_expr": {
+      "from": "RT.SR1..6",
+      "to_key": "src"
+     },
+     "on_missing": "null",
+     "critical": false,
+     "paging": null
+    },
+    {
+     "field": "tgsrt",
+     "to": "Tgsrt",
+     "card": "1:n",
+     "unique": false,
+     "key_expr": {
+      "from": "RT.SR1..6",
+      "to_key": "src"
+     },
+     "on_missing": "null",
+     "critical": false,
+     "paging": null
+    }
+   ],
+   "baseline": {
+    "rows": 1914,
+    "source": "bridge_rt",
+    "note": "1,914 行；perc 仅 PERCCFG=YES 的 44 行有值"
+   }
+  },
+  {
+   "name": "Srt",
+   "summary": "子路由。",
+   "scope": {
+    "ne_types": [
+     "AGCF"
+    ],
+    "status": "ok",
+    "m1": "passed"
+   },
+   "grain": {
+    "key": [
+     "ne",
+     "src"
+    ],
+    "from_rows": "one",
+    "collapse": null
+   },
+   "variants": [],
+   "source": [
+    {
+     "table": "SRT",
+     "moc": "SRT",
+     "role": "primary"
+    }
+   ],
+   "fields": [
+    {
+     "name": "src",
+     "kind": "field",
+     "src": "SRT.SRC",
+     "type": "str",
+     "form": "num_str",
+     "nullable": false,
+     "expose": true,
+     "query": {
+      "ops": [
+       "eq"
+      ],
+      "index": true
+     }
+    },
+    {
+     "name": "o",
+     "kind": "field",
+     "src": "SRT.O",
+     "type": "str",
+     "form": "num_str",
+     "nullable": true,
+     "expose": true
+    },
+    {
+     "name": "srn",
+     "kind": "field",
+     "src": "SRT.SRN",
+     "type": "str",
+     "form": "raw",
+     "nullable": true,
+     "expose": true
+    }
+   ],
+   "links": [
+    {
+     "field": "attr",
+     "to": "SrtAttr",
+     "card": "1:n",
+     "unique": false,
+     "key_expr": {
+      "from": "SRT.SRC",
+      "to_key": "sr"
+     },
+     "on_missing": "null",
+     "critical": false,
+     "paging": null
+    }
+   ],
+   "baseline": {
+    "rows": 2188,
+    "source": "bridge_srt"
+   }
+  },
+  {
+   "name": "Tgsrt",
+   "summary": "中继群→子路由 映射。",
+   "scope": {
+    "ne_types": [
+     "AGCF"
+    ],
+    "status": "ok",
+    "m1": "passed"
+   },
+   "grain": {
+    "key": [
+     "ne",
+     "tg",
+     "src"
+    ],
+    "from_rows": "one",
+    "collapse": null
+   },
+   "variants": [],
+   "source": [
+    {
+     "table": "TGSRT",
+     "moc": "TGSRT",
+     "role": "primary"
+    }
+   ],
+   "fields": [
+    {
+     "name": "tg",
+     "kind": "field",
+     "src": "TGSRT.TG",
+     "type": "str",
+     "form": "raw",
+     "nullable": false,
+     "expose": true,
+     "query": {
+      "ops": [
+       "eq"
+      ],
+      "index": true
+     }
+    },
+    {
+     "name": "src",
+     "kind": "field",
+     "src": "TGSRT.SRC",
+     "type": "str",
+     "form": "num_str",
+     "nullable": false,
+     "expose": true
+    },
+    {
+     "name": "srn",
+     "kind": "field",
+     "src": "TGSRT.SRN",
+     "type": "str",
+     "form": "raw",
+     "nullable": true,
+     "expose": true
+    }
+   ],
+   "links": [
+    {
+     "field": "trunk",
+     "to": "Trunk",
+     "card": "n:1",
+     "unique": true,
+     "key_expr": {
+      "from": "TGSRT.TG",
+      "to_key": "tg"
+     },
+     "on_missing": "dangling",
+     "critical": true,
+     "paging": null
+    }
+   ],
+   "baseline": {
+    "rows": 4916,
+    "source": "bridge_tgsrt"
+   }
+  },
+  {
+   "name": "PraLink",
+   "summary": "PRA 链路(AGCF 侧)。BINIFID 只在单个 MGW 内唯一。",
+   "scope": {
+    "ne_types": [
+     "AGCF"
+    ],
+    "status": "ok",
+    "m1": "passed"
+   },
+   "grain": {
+    "key": [
+     "ne",
+     "tg"
+    ],
+    "from_rows": "one",
+    "collapse": null
+   },
+   "variants": [],
+   "source": [
+    {
+     "table": "PRATG",
+     "moc": "PRATG",
+     "role": "primary"
+    }
+   ],
+   "fields": [
+    {
+     "name": "tg",
+     "kind": "field",
+     "src": "PRATG.TG",
+     "type": "str",
+     "form": "raw",
+     "nullable": false,
+     "expose": true,
+     "query": {
+      "ops": [
+       "eq"
+      ],
+      "index": true
+     }
+    },
+    {
+     "name": "binifid",
+     "kind": "field",
+     "src": "PRATG.BINIFID",
+     "type": "str",
+     "form": "raw",
+     "nullable": true,
+     "expose": true
+    },
+    {
+     "name": "lks",
+     "kind": "field",
+     "src": "PRATG.LKS",
+     "type": "str",
+     "form": "raw",
+     "nullable": true,
+     "expose": true
+    },
+    {
+     "name": "mgw_mid",
+     "kind": "field",
+     "src": "PRATG.MGW",
+     "type": "str",
+     "form": "raw",
+     "nullable": true,
+     "expose": true
+    }
+   ],
+   "links": [
+    {
+     "field": "trunk",
+     "to": "Trunk",
+     "card": "n:1",
+     "unique": true,
+     "key_expr": {
+      "from": "PRATG.TG",
+      "to_key": "tg"
+     },
+     "on_missing": "dangling",
+     "critical": false,
+     "paging": null
+    },
+    {
+     "field": "mgw_link",
+     "to": "MgwLink",
+     "card": "1:n",
+     "unique": false,
+     "key_expr": {
+      "from": "BINIFID",
+      "map": "with_mgw",
+      "to_key": "id"
+     },
+     "on_missing": "dangling",
+     "critical": true,
+     "paging": null
+    }
+   ],
+   "baseline": {
+    "rows": 4376,
+    "source": "bridge_pratg",
+    "note": "PRATG 折叠表 4,376 行；金标准 bridge_pratg 有 4,378 行，差 2 条是 PRALNK 的孤儿（ne=2/tg=254、ne=3/tg=347，记录在案）"
+   }
+  },
+  {
+   "name": "ClrdsnGroup",
+   "summary": "主叫甄别组。同 (ne,dsp) 只取最长 cli 作为组代表。",
+   "scope": {
+    "ne_types": [
+     "AGCF"
+    ],
+    "status": "ok",
+    "m1": "passed"
+   },
+   "grain": {
+    "key": [
+     "ne",
+     "dsp"
+    ],
+    "from_rows": "many",
+    "collapse": {
+     "field": "cli",
+     "by": "longest",
+     "note": "numtrace 口径：同 (ne,dsp) 只留最长 cli"
+    }
+   },
+   "variants": [],
+   "source": [
+    {
+     "table": "CLRDSN",
+     "moc": "CLRDSN",
+     "role": "primary"
+    }
+   ],
+   "fields": [
+    {
+     "name": "dsp",
+     "kind": "field",
+     "src": "CLRDSN.DSP",
+     "type": "str",
+     "form": "raw",
+     "nullable": false,
+     "expose": true,
+     "query": {
+      "ops": [
+       "eq"
+      ],
+      "index": true
+     }
+    },
+    {
+     "name": "func",
+     "kind": "field",
+     "src": "CLRDSN.FUNC",
+     "type": "str",
+     "form": "raw",
+     "nullable": true,
+     "expose": true
+    },
+    {
+     "name": "min",
+     "kind": "field",
+     "src": "CLRDSN.MIN",
+     "type": "str",
+     "form": "num_str",
+     "nullable": true,
+     "expose": true
+    },
+    {
+     "name": "max",
+     "kind": "field",
+     "src": "CLRDSN.MAX",
+     "type": "str",
+     "form": "num_str",
+     "nullable": true,
+     "expose": true
+    },
+    {
+     "name": "cli",
+     "kind": "field",
+     "src": "CLRDSN.CLI",
+     "type": "str",
+     "form": "pfx",
+     "nullable": true,
+     "expose": true
+    },
+    {
+     "name": "members",
+     "kind": "aggregate",
+     "fn": "fn:clrdsn.members",
+     "args": [
+      "CLRDSN.CLI"
+     ],
+     "type": "str",
+     "form": "num_str",
+     "nullable": false,
+     "expose": true
+    }
+   ],
+   "links": [
+    {
+     "field": "trunks",
+     "to": "Trunk",
+     "card": "1:n",
+     "unique": false,
+     "key_expr": {
+      "from": "CLRDSN.DSP",
+      "to_key": "dsg"
+     },
+     "on_missing": "null",
+     "critical": false,
+     "paging": null
+    }
+   ],
+   "baseline": {
+    "rows": 1543,
+    "source": "distinct(ne_id,dsp) in bridge_clrdsn",
+    "note": "26875 行 → 1543 个组"
+   }
+  },
+  {
+   "name": "Transform",
+   "summary": "号码变换规则(TGLD + TGLDIDX + DNC)。",
+   "scope": {
+    "ne_types": [
+     "AGCF"
+    ],
+    "status": "ok",
+    "m1": "passed"
+   },
+   "grain": {
+    "key": [
+     "ne",
+     "cli"
+    ],
+    "from_rows": "many",
+    "collapse": {
+     "field": "cli",
+     "by": "all",
+     "note": "一个 cli 可挂多条索引"
+    }
+   },
+   "variants": [],
+   "source": [
+    {
+     "table": "TGLD",
+     "moc": "TGLD",
+     "role": "primary"
+    },
+    {
+     "table": "TGLDIDX",
+     "moc": "TGLDIDX",
+     "role": "index"
+    },
+    {
+     "table": "DNC",
+     "moc": "DNC",
+     "role": "rule"
+    }
+   ],
+   "fields": [
+    {
+     "name": "cli",
+     "kind": "field",
+     "src": "TGLD.CLI",
+     "type": "str",
+     "form": "pfx",
+     "nullable": false,
+     "expose": true,
+     "query": {
+      "ops": [
+       "eq",
+       "prefix"
+      ],
+      "index": true
+     }
+    },
+    {
+     "name": "bpn",
+     "kind": "field",
+     "src": "TGLD.BPN",
+     "type": "str",
+     "form": "raw",
+     "nullable": true,
+     "expose": true
+    },
+    {
+     "name": "ei",
+     "kind": "field",
+     "src": "TGLD.EI",
+     "type": "str",
+     "form": "raw",
+     "nullable": true,
+     "expose": true
+    },
+    {
+     "name": "ori",
+     "kind": "field",
+     "src": "TGLD.ORI",
+     "type": "str",
+     "form": "raw",
+     "nullable": true,
+     "expose": true
+    },
+    {
+     "name": "rdi",
+     "kind": "field",
+     "src": "TGLD.RDI",
+     "type": "str",
+     "form": "raw",
+     "nullable": true,
+     "expose": true
+    },
+    {
+     "name": "ri",
+     "kind": "field",
+     "src": "TGLD.RI",
+     "type": "str",
+     "form": "raw",
+     "nullable": true,
+     "expose": true
+    },
+    {
+     "name": "rule",
+     "kind": "derived",
+     "fn": "fn:prefix.transform_rule",
+     "type": "str",
+     "form": "raw",
+     "nullable": true,
+     "expose": true,
+     "note": "M1 不实现（无金标准；需 numtrace 的变换规则逻辑）→ M2"
+    }
+   ],
+   "links": [
+    {
+     "field": "inputs",
+     "to": "PrefixRoute",
+     "card": "1:n",
+     "unique": false,
+     "key_expr": {
+      "from": "TGLDIDX.PFX",
+      "to_key": "key"
+     },
+     "on_missing": "null",
+     "critical": false,
+     "paging": null
+    }
+   ],
+   "baseline": {
+    "rows": 50,
+    "source": "bridge_tgld",
+    "note": "50 条规则（TGLD）；索引 TGLDIDX 5,190 行覆盖 43 个 cli；DNC 339 行"
+   }
+  },
+  {
+   "name": "V5Access",
+   "summary": "V5 接入(v5i/v5tg/v5tkc)。仅 did=V5ST 的用户相关。",
+   "scope": {
+    "ne_types": [
+     "AGCF"
+    ],
+    "status": "ok",
+    "m1": "passed"
+   },
+   "grain": {
+    "key": [
+     "ne",
+     "v5iid"
+    ],
+    "from_rows": "one",
+    "collapse": null
+   },
+   "variants": [],
+   "source": [
+    {
+     "table": "V5I",
+     "moc": "V5I",
+     "role": "primary"
+    },
+    {
+     "table": "V5TG",
+     "moc": "V5TG",
+     "role": "member"
+    },
+    {
+     "table": "V5TKC",
+     "moc": "V5TKC",
+     "role": "member"
+    }
+   ],
+   "fields": [
+    {
+     "name": "v5iid",
+     "kind": "field",
+     "src": "V5I.V5IID",
+     "type": "str",
+     "form": "raw",
+     "nullable": false,
+     "expose": true,
+     "query": {
+      "ops": [
+       "eq"
+      ],
+      "index": true
+     }
+    },
+    {
+     "name": "tgid",
+     "kind": "field",
+     "src": "V5I.TGID",
+     "type": "str",
+     "form": "raw",
+     "nullable": true,
+     "expose": true
+    },
+    {
+     "name": "mid",
+     "kind": "field",
+     "src": "V5I.MID",
+     "type": "str",
+     "form": "raw",
+     "nullable": true,
+     "expose": true
+    },
+    {
+     "name": "pnum",
+     "kind": "field",
+     "src": "V5I.PNUM",
+     "type": "str",
+     "form": "raw",
+     "nullable": true,
+     "expose": true
+    },
+    {
+     "name": "snum",
+     "kind": "field",
+     "src": "V5I.SNUM",
+     "type": "str",
+     "form": "raw",
+     "nullable": true,
+     "expose": true
+    },
+    {
+     "name": "pstnnum",
+     "kind": "field",
+     "src": "V5I.PSTNNUM",
+     "type": "str",
+     "form": "raw",
+     "nullable": true,
+     "expose": true
+    },
+    {
+     "name": "mgeid",
+     "kind": "field",
+     "src": "V5TG.MGEID",
+     "type": "str",
+     "form": "raw",
+     "nullable": true,
+     "expose": true
+    },
+    {
+     "name": "tgn",
+     "kind": "field",
+     "src": "V5TG.TGN",
+     "type": "str",
+     "form": "raw",
+     "nullable": true,
+     "expose": true
+    }
+   ],
+   "links": [
+    {
+     "field": "tg",
+     "to": "Trunk",
+     "card": "n:1",
+     "unique": true,
+     "key_expr": {
+      "from": "V5TG.TGN",
+      "to_key": "tg"
+     },
+     "on_missing": "dangling",
+     "critical": true,
+     "paging": null
+    },
+    {
+     "field": "mgw",
+     "to": "Mgw",
+     "card": "n:1",
+     "unique": true,
+     "key_expr": {
+      "from": "V5TG.MGEID",
+      "map": "ip_port_to_mid",
+      "to_key": "mid"
+     },
+     "on_missing": "dangling",
+     "critical": false,
+     "paging": null
+    }
+   ],
+   "baseline": {
+    "rows": 1614,
+    "source": "bridge_v5i",
+    "note": "1,614 个对象（V5I 1,614 行；金标准 v5i 1,616 行中 2 行 v5iid 为空，无法构成对象）"
+   }
+  },
+  {
+   "name": "Ne",
+   "summary": "网元(仅 AGCF；MGW 网元不在本版 scope)。",
+   "scope": {
+    "ne_types": [
+     "AGCF"
+    ],
+    "status": "ok",
+    "m1": "passed"
+   },
+   "grain": {
+    "key": [
+     "ne_id"
+    ],
+    "from_rows": "one",
+    "collapse": null
+   },
+   "variants": [],
+   "source": [
+    {
+     "table": "ne",
+     "moc": "ne",
+     "role": "primary",
+     "note": "元信息(旧库)；ims_mem2 侧由 Library 的 NE 列表提供"
+    }
+   ],
+   "fields": [
+    {
+     "name": "mename",
+     "kind": "field",
+     "src": "ne.mename",
+     "type": "str",
+     "form": "raw",
+     "nullable": false,
+     "expose": true,
+     "query": {
+      "ops": [
+       "eq",
+       "prefix"
+      ],
+      "index": true
+     }
+    },
+    {
+     "name": "site",
+     "kind": "field",
+     "src": "site.site_name",
+     "type": "str",
+     "form": "raw",
+     "nullable": true,
+     "expose": true
+    },
+    {
+     "name": "batch",
+     "kind": "field",
+     "src": "ne.batch",
+     "type": "str",
+     "form": "num_str",
+     "nullable": true,
+     "expose": true
+    },
+    {
+     "name": "table_row_counts",
+     "kind": "aggregate",
+     "fn": "fn:ne.table_row_counts",
+     "type": "str",
+     "form": "json_text",
+     "nullable": false,
+     "expose": true
+    }
+   ],
+   "links": [
+    {
+     "field": "subscribers",
+     "to": "Subscriber",
+     "card": "1:n",
+     "unique": false,
+     "key_expr": {
+      "from": "ne_id",
+      "to_key": "ne"
+     },
+     "on_missing": "null",
+     "critical": false,
+     "paging": null
+    },
+    {
+     "field": "trunks",
+     "to": "Trunk",
+     "card": "1:n",
+     "unique": false,
+     "key_expr": {
+      "from": "ne_id",
+      "to_key": "ne"
+     },
+     "on_missing": "null",
+     "critical": false,
+     "paging": null
+    }
+   ],
+   "baseline": {
+    "rows": 6,
+    "source": "AGCF 正式名集合(AGCF51/52/63/64/65/66)",
+    "note": "旧库 ne 有 16 行(6 AGCF + 10 MGW)，MGW 不在本版"
+   },
+   "catalog": {
+    "pool": "ne",
+    "reach": "any"
+   }
+  },
+  {
+   "name": "Mgw",
+   "summary": "媒体网关。一个 MGW 一个对象（10 个）；字段来自 MGW O&M log 导入（D70）。",
+   "scope": {
+    "ne_types": [
+     "MGW"
+    ],
+    "status": "ok",
+    "m1": "passed"
+   },
+   "grain": {
+    "key": [
+     "mid"
+    ],
+    "from_rows": "one",
+    "collapse": null
+   },
+   "variants": [],
+   "source": [
+    {
+     "table": "mgw_ne",
+     "moc": "mgw_ne",
+     "role": "primary",
+     "note": "ims_mem2 侧 = `MgwLibrary.nes`（10 个 `MgwNe`）"
+    },
+    {
+     "table": "mgw_*_cur",
+     "moc": "mgw_*",
+     "role": "member",
+     "note": "MGW 的 38 张 dedicated 表（Q921LNK/V5E1/V5LNK/MTP2LNK/L2UALNK/H248LNK/N7LNK/…）"
+    }
+   ],
+   "fields": [
+    {
+     "name": "mid",
+     "kind": "field",
+     "src": "mgw_ne.mid",
+     "type": "str",
+     "form": "raw",
+     "nullable": false,
+     "expose": true,
+     "query": {
+      "ops": [
+       "eq",
+       "prefix"
+      ],
+      "index": true
+     },
+     "note": "设备身份 `VMGW.MID`（`IP:port`）；本仓由 `MgwLibrary` 的 `MgwNe.mid` 提供"
+    },
+    {
+     "name": "name",
+     "kind": "field",
+     "src": "mgw_ne.mename",
+     "type": "str",
+     "form": "raw",
+     "nullable": true,
+     "expose": true,
+     "note": "台账名（`深圳-龙华IMS-MGW01`），来自 `mgw_ne_map.tsv`"
+    },
+    {
+     "name": "site",
+     "kind": "field",
+     "src": "mgw_ne.short",
+     "type": "str",
+     "form": "raw",
+     "nullable": true,
+     "expose": true,
+     "note": "简称（`lh1`…）；ims_core 的 `site.site_name` 是 `site_<short>`"
+    },
+    {
+     "name": "controller",
+     "kind": "field",
+     "src": "mgw_mgc.MID",
+     "type": "str",
+     "form": "num_str",
+     "nullable": true,
+     "expose": true,
+     "note": "控制它的 MGC/MSS 地址（MGC 表的 `MID` 列）"
+    },
+    {
+     "name": "addr",
+     "kind": "field",
+     "src": "mgw_ne.mid",
+     "type": "str",
+     "form": "raw",
+     "nullable": true,
+     "expose": true,
+     "note": "同 `mid`（对外寻址用）"
+    },
+    {
+     "name": "link_counts",
+     "kind": "aggregate",
+     "fn": "fn:mgw.link_counts",
+     "type": "str",
+     "form": "json_text",
+     "nullable": false,
+     "expose": true,
+     "note": "各族链路条数 JSON：`{\"q921lnk\":…,\"v5e1\":…,\"v5lnk\":…,\"mtp2lnk\":…,\"l2ualnk\":…,\"h248lnk\":…,\"n7lnk\":…}`（为 0 的族不出现）"
+    }
+   ],
+   "links": [
+    {
+     "field": "agcf",
+     "to": "Ne",
+     "card": "n:1",
+     "unique": true,
+     "key_expr": {
+      "from": "mgw_ne.ne_id",
+      "to_key": "ne_id"
+     },
+     "on_missing": "dangling",
+     "critical": false,
+     "paging": null
+    },
+    {
+     "field": "links",
+     "to": "MgwLink",
+     "card": "1:n",
+     "unique": false,
+     "key_expr": {
+      "from": "mid",
+      "to_key": "mgw_mid"
+     },
+     "on_missing": "null",
+     "critical": false,
+     "paging": null
+    }
+   ],
+   "baseline": {
+    "rows": 10,
+    "source": "rust_libraru.db:mgw_ne",
+    "note": "blocked：本版不实现"
+   },
+   "catalog": {
+    "pool": "gateway",
+    "reach": "any"
+   }
+  },
+  {
+   "name": "MgwLink",
+   "summary": "MGW 侧的 IP 链路（L2UA 82 条 + H248 24 条 = 106 条）；key = `(mgw_mid, kind, id)`。",
+   "scope": {
+    "ne_types": [
+     "MGW"
+    ],
+    "status": "ok",
+    "m1": "passed"
+   },
+   "grain": {
+    "key": [
+     "mgw_mid",
+     "kind",
+     "id"
+    ],
+    "from_rows": "one",
+    "collapse": null
+   },
+   "variants": [],
+   "source": [
+    {
+     "table": "mgw_l2ualnk",
+     "moc": "mgw_l2ualnk",
+     "role": "primary"
+    },
+    {
+     "table": "mgw_h248lnk",
+     "moc": "mgw_h248lnk",
+     "role": "member"
+    }
+   ],
+   "fields": [
+    {
+     "name": "mgw_mid",
+     "kind": "field",
+     "src": "mgw_ne.mid",
+     "type": "str",
+     "form": "raw",
+     "nullable": false,
+     "expose": true,
+     "note": "所属 MGW 的 `VMGW.MID`"
+    },
+    {
+     "name": "kind",
+     "kind": "const",
+     "value": "_table",
+     "type": "str",
+     "form": "raw",
+     "nullable": false,
+     "expose": true,
+     "note": "链路族：`l2ua`（`mgw_l2ualnk`，82 条）/ `h248`（`mgw_h248lnk`，24 条）"
+    },
+    {
+     "name": "id",
+     "kind": "field",
+     "src": "mgw_l2ualnk.LNKNO",
+     "type": "str",
+     "form": "raw",
+     "nullable": true,
+     "expose": true,
+     "note": "l2ua 族取 `PROTYPE/LNKNO`（`PROTYPE` 有 IUA/M2UA 两值，单靠 `LNKNO` 会有 6 组撞键）；h248 族取 `LINKID`（每网元唯一）"
+    },
+    {
+     "name": "local",
+     "kind": "field",
+     "src": "mgw_l2ualnk.LOCALIP1",
+     "type": "str",
+     "form": "raw",
+     "nullable": true,
+     "expose": true,
+     "note": "h248 族取 `LOCALIP`"
+    },
+    {
+     "name": "remote",
+     "kind": "field",
+     "src": "mgw_l2ualnk.REMOTEIP1",
+     "type": "str",
+     "form": "raw",
+     "nullable": true,
+     "expose": true,
+     "note": "h248 族取 `PEERIP`"
+    }
+   ],
+   "links": [
+    {
+     "field": "mgw",
+     "to": "Mgw",
+     "card": "n:1",
+     "unique": true,
+     "key_expr": {
+      "from": "mgw_mid",
+      "to_key": "mid"
+     },
+     "on_missing": "dangling",
+     "critical": false,
+     "paging": null
+    }
+   ],
+   "baseline": {
+    "rows": null,
+    "source": "rust_libraru.db:mgw_q921lnk_cur=4711 等",
+    "note": "blocked：本版不实现"
+   }
+  },
+  {
+   "name": "SrtAttr",
+   "summary": "子路由属性(legacy_only：本版只声明，不实现)。",
+   "scope": {
+    "ne_types": [
+     "AGCF"
+    ],
+    "status": "ok",
+    "m1": "passed"
+   },
+   "grain": {
+    "key": [
+     "ne",
+     "r",
+     "sr"
+    ],
+    "from_rows": "many",
+    "collapse": {
+     "field": "sr",
+     "by": "all",
+     "note": "一个 (r,sr) 可有多条属性"
+    }
+   },
+   "variants": [],
+   "source": [
+    {
+     "table": "SRTATTR",
+     "moc": "SRTATTR",
+     "role": "primary"
+    }
+   ],
+   "fields": [
+    {
+     "name": "r",
+     "kind": "field",
+     "src": "SRTATTR.R",
+     "type": "str",
+     "form": "num_str",
+     "nullable": true,
+     "expose": true
+    },
+    {
+     "name": "sr",
+     "kind": "field",
+     "src": "SRTATTR.SR",
+     "type": "str",
+     "form": "num_str",
+     "nullable": true,
+     "expose": true
+    },
+    {
+     "name": "srtp",
+     "kind": "field",
+     "src": "SRTATTR.SRTP",
+     "type": "str",
+     "form": "raw",
+     "nullable": true,
+     "expose": true
+    },
+    {
+     "name": "srn",
+     "kind": "field",
+     "src": "SRTATTR.SRN",
+     "type": "str",
+     "form": "raw",
+     "nullable": true,
+     "expose": true
+    },
+    {
+     "name": "psr",
+     "kind": "field",
+     "src": "SRTATTR.PSR",
+     "type": "str",
+     "form": "raw",
+     "nullable": true,
+     "expose": true
+    },
+    {
+     "name": "cst",
+     "kind": "field",
+     "src": "SRTATTR.CST",
+     "type": "str",
+     "form": "raw",
+     "nullable": true,
+     "expose": true
+    }
+   ],
+   "links": [],
+   "baseline": {
+    "rows": 290,
+    "source": "bridge_srtattr"
+   }
+  },
+  {
+   "name": "N7tg",
+   "summary": "No.7 中继群（21 列 + kc 折叠）。kc = N7TKC 按 (MN,SC) 排序后每 32 条一段的 JSON 数组文本。",
+   "scope": {
+    "ne_types": [
+     "AGCF"
+    ],
+    "status": "ok",
+    "m1": "passed"
+   },
+   "grain": {
+    "key": [
+     "ne",
+     "tg"
+    ],
+    "from_rows": "one",
+    "collapse": null
+   },
+   "variants": [],
+   "source": [
+    {
+     "table": "N7TG",
+     "moc": "N7TG",
+     "role": "primary"
+    },
+    {
+     "table": "N7TKC",
+     "moc": "N7TKC",
+     "role": "member",
+     "note": "kc 折叠的原料（稀疏 arena 视图）"
+    }
+   ],
+   "fields": [
+    {
+     "name": "tg",
+     "kind": "field",
+     "src": "N7TG.TG",
+     "type": "str",
+     "form": "raw",
+     "nullable": false,
+     "expose": true,
+     "query": {
+      "ops": [
+       "eq",
+       "prefix"
+      ],
+      "index": true
+     }
+    },
+    {
+     "name": "csc",
+     "kind": "field",
+     "src": "N7TG.CSC",
+     "type": "str",
+     "form": "num_str",
+     "nullable": true,
+     "expose": true
+    },
+    {
+     "name": "ct",
+     "kind": "field",
+     "src": "N7TG.CT",
+     "type": "str",
+     "form": "enum_code",
+     "nullable": true,
+     "expose": true,
+     "note": "TUP→1（词→码从金标准反推）"
+    },
+    {
+     "name": "di",
+     "kind": "field",
+     "src": "N7TG.DI",
+     "type": "str",
+     "form": "pfx",
+     "nullable": true,
+     "expose": true
+    },
+    {
+     "name": "eid",
+     "kind": "field",
+     "src": "N7TG.EID",
+     "type": "str",
+     "form": "raw",
+     "nullable": true,
+     "expose": true
+    },
+    {
+     "name": "icr",
+     "kind": "field",
+     "src": "N7TG.ICR",
+     "type": "str",
+     "form": "bits",
+     "nullable": true,
+     "expose": true
+    },
+    {
+     "name": "ioi",
+     "kind": "field",
+     "src": "N7TG.IOI",
+     "type": "str",
+     "form": "raw",
+     "nullable": true,
+     "expose": true
+    },
+    {
+     "name": "isbf",
+     "kind": "field",
+     "src": "N7TG.ISBF",
+     "type": "str",
+     "form": "enum_code",
+     "nullable": false,
+     "expose": true,
+     "note": "YES→0 / NO→1（取反）"
+    },
+    {
+     "name": "isdp",
+     "kind": "field",
+     "src": "N7TG.ISDP",
+     "type": "str",
+     "form": "enum_code",
+     "nullable": false,
+     "expose": true,
+     "note": "取反"
+    },
+    {
+     "name": "mtg",
+     "kind": "field",
+     "src": "N7TG.MTG",
+     "type": "str",
+     "form": "num_str",
+     "nullable": true,
+     "expose": true
+    },
+    {
+     "name": "nicf",
+     "kind": "field",
+     "src": "N7TG.NICF",
+     "type": "str",
+     "form": "enum_code",
+     "nullable": false,
+     "expose": true,
+     "note": "取反"
+    },
+    {
+     "name": "npcld",
+     "kind": "field",
+     "src": "N7TG.NPCLD",
+     "type": "str",
+     "form": "enum_code",
+     "nullable": false,
+     "expose": true,
+     "note": "取反"
+    },
+    {
+     "name": "ocr",
+     "kind": "field",
+     "src": "N7TG.OCR",
+     "type": "str",
+     "form": "bits",
+     "nullable": true,
+     "expose": true
+    },
+    {
+     "name": "rival",
+     "kind": "field",
+     "src": "N7TG.RIVAL",
+     "type": "str",
+     "form": "num_str",
+     "nullable": true,
+     "expose": true
+    },
+    {
+     "name": "sdpc",
+     "kind": "field",
+     "src": "N7TG.SDPC",
+     "type": "str",
+     "form": "raw",
+     "nullable": true,
+     "expose": true
+    },
+    {
+     "name": "sopc",
+     "kind": "field",
+     "src": "N7TG.SOPC",
+     "type": "str",
+     "form": "num_str",
+     "nullable": true,
+     "expose": true
+    },
+    {
+     "name": "src",
+     "kind": "field",
+     "src": "N7TG.SRC",
+     "type": "str",
+     "form": "num_str",
+     "nullable": true,
+     "expose": true
+    },
+    {
+     "name": "srm",
+     "kind": "field",
+     "src": "N7TG.SRM",
+     "type": "str",
+     "form": "num_str",
+     "nullable": true,
+     "expose": true
+    },
+    {
+     "name": "tgms",
+     "kind": "field",
+     "src": "N7TG.TGMS",
+     "type": "str",
+     "form": "enum_code",
+     "nullable": true,
+     "expose": true,
+     "note": "SLAVE→1"
+    },
+    {
+     "name": "tgn",
+     "kind": "field",
+     "src": "N7TG.TGN",
+     "type": "str",
+     "form": "raw",
+     "nullable": true,
+     "expose": true
+    },
+    {
+     "name": "kc",
+     "kind": "aggregate",
+     "fn": "fn:n7tg.kc",
+     "args": [
+      "N7TKC.MN",
+      "N7TKC.SC",
+      "N7TKC.SCIC",
+      "N7TKC.TID",
+      "N7TKC.SCF",
+      "N7TKC.CS"
+     ],
+     "type": "str",
+     "form": "json_text",
+     "nullable": true,
+     "expose": true,
+     "note": "按 (MN,SC) 排序后每 32 条一段"
+    }
+   ],
+   "links": [
+    {
+     "field": "trunk",
+     "to": "Trunk",
+     "card": "n:1",
+     "unique": true,
+     "key_expr": {
+      "from": "N7TG.TG",
+      "to_key": "tg"
+     },
+     "on_missing": "dangling",
+     "critical": true,
+     "paging": null
+    }
+   ],
+   "catalog": {
+    "pool": "trunk",
+    "reach": "any"
+   },
+   "baseline": {
+    "rows": 29,
+    "source": "bridge_n7tg",
+    "note": "29 条 No.7 中继群；kc 逐条 JSON 字节一致"
+   }
+  },
+  {
+   "name": "Q921Link",
+   "summary": "MGW 侧的 Q921 链路（4,711 条，最大的 MGW 对象族）。表即对象：`mgw_q921lnk`。",
+   "scope": {
+    "ne_types": [
+     "MGW"
+    ],
+    "status": "ok",
+    "m1": "passed"
+   },
+   "grain": {
+    "key": [
+     "ne",
+     "lnkno"
+    ],
+    "from_rows": "one",
+    "collapse": null
+   },
+   "variants": [],
+   "source": [
+    {
+     "table": "mgw_q921lnk",
+     "moc": "mgw_q921lnk",
+     "role": "primary"
+    }
+   ],
+   "fields": [
+    {
+     "name": "ne",
+     "kind": "field",
+     "src": "mgw_ne.short",
+     "type": "str",
+     "form": "raw",
+     "nullable": false,
+     "expose": true,
+     "note": "所属 MGW 简称（`lh1`…）"
+    },
+    {
+     "name": "lnkno",
+     "kind": "field",
+     "src": "mgw_q921lnk.LNKNO",
+     "type": "str",
+     "form": "raw",
+     "nullable": false,
+     "expose": true,
+     "note": "链路号（自然键）"
+    },
+    {
+     "name": "name",
+     "kind": "field",
+     "src": "mgw_q921lnk.LNKNAME",
+     "type": "str",
+     "form": "raw",
+     "nullable": true,
+     "expose": true,
+     "note": "链路名（对端局向名）"
+    },
+    {
+     "name": "binifid",
+     "kind": "field",
+     "src": "mgw_q921lnk.BINIFID",
+     "type": "str",
+     "form": "raw",
+     "nullable": true,
+     "expose": true,
+     "note": "承载接口 ID"
+    },
+    {
+     "name": "ifbn",
+     "kind": "field",
+     "src": "mgw_q921lnk.IFBN",
+     "type": "str",
+     "form": "raw",
+     "nullable": true,
+     "expose": true,
+     "note": "承载的接口板 `BN`（→ `Board.bn`）"
+    },
+    {
+     "name": "opn",
+     "kind": "field",
+     "src": "mgw_q921lnk.OPN",
+     "type": "str",
+     "form": "raw",
+     "nullable": true,
+     "expose": true,
+     "note": "光口号"
+    },
+    {
+     "name": "e1t1n",
+     "kind": "field",
+     "src": "mgw_q921lnk.E1T1N",
+     "type": "str",
+     "form": "raw",
+     "nullable": true,
+     "expose": true,
+     "note": "E1/T1 序号"
+    },
+    {
+     "name": "spfbn",
+     "kind": "field",
+     "src": "mgw_q921lnk.SPFBN",
+     "type": "str",
+     "form": "raw",
+     "nullable": true,
+     "expose": true,
+     "note": "所在 SPF 板 `BN`"
+    },
+    {
+     "name": "subbn",
+     "kind": "field",
+     "src": "mgw_q921lnk.SUBN",
+     "type": "str",
+     "form": "raw",
+     "nullable": true,
+     "expose": true
+    },
+    {
+     "name": "subbcid",
+     "kind": "field",
+     "src": "mgw_q921lnk.SUBBCID",
+     "type": "str",
+     "form": "raw",
+     "nullable": true,
+     "expose": true
+    }
+   ],
+   "links": [
+    {
+     "field": "board",
+     "to": "Board",
+     "card": "n:1",
+     "unique": true,
+     "key_expr": {
+      "from": "ifbn",
+      "to_key": "bn"
+     },
+     "on_missing": "dangling",
+     "critical": false,
+     "paging": null,
+     "note": "同网元内按 `bn` 连（对象本身已按 `ne` 分域）"
+    },
+    {
+     "field": "tie",
+     "to": "Mgw",
+     "card": "n:1",
+     "unique": true,
+     "key_expr": {
+      "from": "ne",
+      "to_key": "site"
+     },
+     "on_missing": "dangling",
+     "critical": false,
+     "paging": null
+    }
+   ]
+  },
+  {
+   "name": "V5Link",
+   "summary": "MGW 侧的 V5 链路（1,575 条）。表即对象：`mgw_v5lnk`。",
+   "scope": {
+    "ne_types": [
+     "MGW"
+    ],
+    "status": "ok",
+    "m1": "passed"
+   },
+   "grain": {
+    "key": [
+     "ne",
+     "lnkno"
+    ],
+    "from_rows": "one",
+    "collapse": null
+   },
+   "variants": [],
+   "source": [
+    {
+     "table": "mgw_v5lnk",
+     "moc": "mgw_v5lnk",
+     "role": "primary"
+    }
+   ],
+   "fields": [
+    {
+     "name": "ne",
+     "kind": "field",
+     "src": "mgw_ne.short",
+     "type": "str",
+     "form": "raw",
+     "nullable": false,
+     "expose": true
+    },
+    {
+     "name": "lnkno",
+     "kind": "field",
+     "src": "mgw_v5lnk.LNKNO",
+     "type": "str",
+     "form": "raw",
+     "nullable": false,
+     "expose": true,
+     "note": "链路号（自然键）"
+    },
+    {
+     "name": "name",
+     "kind": "field",
+     "src": "mgw_v5lnk.LNKNAME",
+     "type": "str",
+     "form": "raw",
+     "nullable": true,
+     "expose": true
+    },
+    {
+     "name": "e1id",
+     "kind": "field",
+     "src": "mgw_v5lnk.E1ID",
+     "type": "str",
+     "form": "raw",
+     "nullable": true,
+     "expose": true,
+     "note": "对应的 V5 E1（→ `mgw_v5e1.E1ID`）"
+    },
+    {
+     "name": "spfbn",
+     "kind": "field",
+     "src": "mgw_v5lnk.SPFBN",
+     "type": "str",
+     "form": "raw",
+     "nullable": true,
+     "expose": true
+    },
+    {
+     "name": "subbn",
+     "kind": "field",
+     "src": "mgw_v5lnk.SUBN",
+     "type": "str",
+     "form": "raw",
+     "nullable": true,
+     "expose": true
+    },
+    {
+     "name": "subbcid",
+     "kind": "field",
+     "src": "mgw_v5lnk.SUBBCID",
+     "type": "str",
+     "form": "raw",
+     "nullable": true,
+     "expose": true
+    }
+   ],
+   "links": [
+    {
+     "field": "tie",
+     "to": "Mgw",
+     "card": "n:1",
+     "unique": true,
+     "key_expr": {
+      "from": "ne",
+      "to_key": "site"
+     },
+     "on_missing": "dangling",
+     "critical": false,
+     "paging": null
+    }
+   ]
+  },
+  {
+   "name": "Tdmiu",
+   "summary": "MGW 侧的 TDM IU 时隙（448 条）。表即对象：`mgw_tdmiu`。",
+   "scope": {
+    "ne_types": [
+     "MGW"
+    ],
+    "status": "ok",
+    "m1": "passed"
+   },
+   "grain": {
+    "key": [
+     "ne",
+     "bn",
+     "opt",
+     "tidfv"
+    ],
+    "from_rows": "one",
+    "collapse": null
+   },
+   "variants": [],
+   "source": [
+    {
+     "table": "mgw_tdmiu",
+     "moc": "mgw_tdmiu",
+     "role": "primary"
+    }
+   ],
+   "fields": [
+    {
+     "name": "ne",
+     "kind": "field",
+     "src": "mgw_ne.short",
+     "type": "str",
+     "form": "raw",
+     "nullable": false,
+     "expose": true
+    },
+    {
+     "name": "bn",
+     "kind": "field",
+     "src": "mgw_tdmiu.BN",
+     "type": "str",
+     "form": "raw",
+     "nullable": false,
+     "expose": true,
+     "note": "板号（自然键之一，→ `Board.bn`）"
+    },
+    {
+     "name": "opt",
+     "kind": "field",
+     "src": "mgw_tdmiu.OPT",
+     "type": "str",
+     "form": "raw",
+     "nullable": false,
+     "expose": true,
+     "note": "光口号（自然键之一）"
+    },
+    {
+     "name": "tidfv",
+     "kind": "field",
+     "src": "mgw_tdmiu.TIDFV",
+     "type": "str",
+     "form": "raw",
+     "nullable": false,
+     "expose": true,
+     "note": "TID 起始值（自然键之一）"
+    },
+    {
+     "name": "tidlv",
+     "kind": "field",
+     "src": "mgw_tdmiu.TIDLV",
+     "type": "str",
+     "form": "raw",
+     "nullable": true,
+     "expose": true,
+     "note": "TID 结束值"
+    },
+    {
+     "name": "vmgwid",
+     "kind": "field",
+     "src": "mgw_tdmiu.VMGWID",
+     "type": "str",
+     "form": "raw",
+     "nullable": true,
+     "expose": true,
+     "note": "所属虚拟 MGW（→ `mgw_vmgw.VMGWID`）"
+    },
+    {
+     "name": "rt",
+     "kind": "field",
+     "src": "mgw_tdmiu.RT",
+     "type": "str",
+     "form": "raw",
+     "nullable": true,
+     "expose": true
+    },
+    {
+     "name": "hostid",
+     "kind": "field",
+     "src": "mgw_tdmiu.HOSTID",
+     "type": "str",
+     "form": "raw",
+     "nullable": true,
+     "expose": true
+    }
+   ],
+   "links": [
+    {
+     "field": "board",
+     "to": "Board",
+     "card": "n:1",
+     "unique": true,
+     "key_expr": {
+      "from": "bn",
+      "to_key": "bn"
+     },
+     "on_missing": "dangling",
+     "critical": false,
+     "paging": null
+    }
+   ]
+  },
+  {
+   "name": "Board",
+   "summary": "MGW 的机框板卡（408 条）。**注意与 AGCF 的 `BRD` 同名但不同物**：AGCF 的 `BRD` 是 AGCF 自己的板卡声明（`cur_BRD`），这里是 MGW 机框里的板卡。",
+   "scope": {
+    "ne_types": [
+     "MGW"
+    ],
+    "status": "ok",
+    "m1": "passed"
+   },
+   "grain": {
+    "key": [
+     "ne",
+     "fn",
+     "sn",
+     "bp"
+    ],
+    "from_rows": "one",
+    "collapse": null
+   },
+   "variants": [],
+   "source": [
+    {
+     "table": "mgw_brd",
+     "moc": "mgw_brd",
+     "role": "primary"
+    }
+   ],
+   "fields": [
+    {
+     "name": "ne",
+     "kind": "field",
+     "src": "mgw_ne.short",
+     "type": "str",
+     "form": "raw",
+     "nullable": false,
+     "expose": true
+    },
+    {
+     "name": "fn",
+     "kind": "field",
+     "src": "mgw_brd.FN",
+     "type": "str",
+     "form": "raw",
+     "nullable": false,
+     "expose": true,
+     "note": "框号（自然键之一）"
+    },
+    {
+     "name": "sn",
+     "kind": "field",
+     "src": "mgw_brd.SN",
+     "type": "str",
+     "form": "raw",
+     "nullable": false,
+     "expose": true,
+     "note": "槽号（自然键之一）"
+    },
+    {
+     "name": "bp",
+     "kind": "field",
+     "src": "mgw_brd.BP",
+     "type": "str",
+     "form": "raw",
+     "nullable": false,
+     "expose": true,
+     "note": "前后插（自然键之一）"
+    },
+    {
+     "name": "bt",
+     "kind": "field",
+     "src": "mgw_brd.BT",
+     "type": "str",
+     "form": "raw",
+     "nullable": true,
+     "expose": true,
+     "note": "板类型（`VPU`/`SPF`/…）"
+    },
+    {
+     "name": "hbt",
+     "kind": "field",
+     "src": "mgw_brd.HBT",
+     "type": "str",
+     "form": "raw",
+     "nullable": true,
+     "expose": true
+    },
+    {
+     "name": "bs",
+     "kind": "field",
+     "src": "mgw_brd.BS",
+     "type": "str",
+     "form": "raw",
+     "nullable": true,
+     "expose": true,
+     "note": "主备（`LOADSHARE`…）"
+    },
+    {
+     "name": "bn",
+     "kind": "field",
+     "src": "mgw_brd.BN",
+     "type": "str",
+     "form": "raw",
+     "nullable": true,
+     "expose": true,
+     "note": "板号（→ `Q921Link.ifbn` / `Tdmiu.bn`）"
+    }
+   ],
+   "links": []
+  }
+ ],
+ "coverage": [
+  {
+   "route": "/api/nes",
+   "needs": [
+    "ne.mename",
+    "ne.site",
+    "ipaddr.ip4",
+    "mgw_ne.mid"
+   ],
+   "io": [
+    "Ne",
+    "Mgw"
+   ],
+   "status": "partial",
+   "note": "MGW 部分由 Mgw IO 承载（D70）"
+  },
+  {
+   "route": "/api/search?mode=users",
+   "needs": [
+    "ASBR.PUI",
+    "ASBR.DID",
+    "SRVRGT.IMPU"
+   ],
+   "io": [
+    "Subscriber"
+   ],
+   "status": "covered"
+  },
+  {
+   "route": "/api/search?mode=callee",
+   "needs": [
+    "CNACLD.PFX",
+    "CNACLD.RSC",
+    "RTANA.RSC",
+    "RT.R",
+    "SRT.SRC",
+    "TGSRT.TG",
+    "SRTCOST.CST",
+    "OFC.DOL"
+   ],
+   "io": [
+    "PrefixRoute",
+    "Rtana",
+    "Rt",
+    "Srt",
+    "Tgsrt",
+    "Trunk"
+   ],
+   "status": "covered"
+  },
+  {
+   "route": "/api/search?mode=caller",
+   "needs": [
+    "CLRDSN.CLI",
+    "CLRDSN.DSP",
+    "TGLDIDX.PFX",
+    "DNC.DCX"
+   ],
+   "io": [
+    "PrefixRoute",
+    "ClrdsnGroup",
+    "Transform"
+   ],
+   "status": "covered"
+  },
+  {
+   "route": "/api/search?mode=chg",
+   "needs": [
+    "SPDNC.ND",
+    "PFXPRO.PFX",
+    "TGLDIDX.PFX",
+    "TGLD.CLI",
+    "DNC.DCT"
+   ],
+   "io": [
+    "Transform",
+    "PrefixRoute"
+   ],
+   "status": "partial",
+   "note": "SPDNC/PFXPRO 未建 IO → legacy_only"
+  },
+  {
+   "route": "/api/search?mode=segment",
+   "needs": [
+    "CNACLD.PFX",
+    "CLRDSN.CLI",
+    "N7TG.TG",
+    "SIPTG.TG"
+   ],
+   "io": [
+    "PrefixRoute",
+    "Trunk",
+    "ClrdsnGroup"
+   ],
+   "status": "covered"
+  },
+  {
+   "route": "/api/trace/callee",
+   "needs": [
+    "SRTATTR.SRTP",
+    "SIPIPPAIR.IMN",
+    "IUALKS.LSX",
+    "IUALNK.LNKNAME",
+    "mgw_q921lnk.BINIFID",
+    "mgw_l2ualks.LKS",
+    "IPADDR.IP4"
+   ],
+   "io": [
+    "PrefixRoute",
+    "Trunk",
+    "PraLink",
+    "SrtAttr"
+   ],
+   "status": "partial",
+   "note": "SIPIPPAIR/IUALKS/IUALNK/MGW 侧 legacy_only"
+  },
+  {
+   "route": "/api/trace/rana",
+   "needs": [
+    "CNACLR.DIFF"
+   ],
+   "io": [
+    "PrefixRoute"
+   ],
+   "status": "legacy_only",
+   "note": "依赖 cnaclr.diff 的 RANA 标记；桥接侧 diff 恒 null，必须走 SQLite 或补 diff 语义"
+  },
+  {
+   "route": "/api/trace/caller",
+   "needs": [
+    "TGLDIDX.CLI",
+    "CLRDSN.CLI",
+    "CALLSRC.LDN",
+    "DNC.DCT"
+   ],
+   "io": [
+    "PrefixRoute",
+    "ClrdsnGroup",
+    "Transform"
+   ],
+   "status": "partial",
+   "note": "CALLSRC(40 行)未建 IO → legacy_only；其余三表已覆盖"
+  },
+  {
+   "route": "/api/user",
+   "needs": [
+    "ASBR.PUI",
+    "V5I.V5IID",
+    "V5TG.TGID",
+    "V5TKC.TGID",
+    "V5UALKS.LSX",
+    "V5UALNK.LNKNAME"
+   ],
+   "io": [
+    "Subscriber",
+    "V5Access"
+   ],
+   "status": "partial",
+   "note": "V5UALKS/V5UALNK 未建 IO"
+  },
+  {
+   "route": "/api/tg",
+   "needs": [
+    "PRATG.MGW",
+    "PRATG.BINIFID",
+    "TGAP.TGN",
+    "TGLDIDX.CLI"
+   ],
+   "io": [
+    "Trunk",
+    "PraLink",
+    "Transform"
+   ],
+   "status": "partial",
+   "note": "MGW 侧 blocked"
+  },
+  {
+   "route": "/api/mgw",
+   "needs": [
+    "mgw_ne",
+    "mgw_*_cur"
+   ],
+   "io": [
+    "Mgw",
+    "MgwLink"
+   ],
+   "status": "covered",
+   "note": "Mgw 10 个对象 / MgwLink 106 条，对 mgw_library.db 金标准"
+  },
+  {
+   "route": "/api/doc/*",
+   "needs": [
+    "agcf_mml.db:commands/parameters/param_options",
+    "commands.json"
+   ],
+   "io": [],
+   "status": "out_of_scope",
+   "note": "文档库，不属于 IO 层"
+  },
+  {
+   "route": "/api/meta",
+   "needs": [
+    "tbl_moc",
+    "moc_doc",
+    "zh_*",
+    "enum_dec"
+   ],
+   "io": [],
+   "status": "out_of_scope",
+   "note": "元数据服务"
+  },
+  {
+   "route": "/api/batches",
+   "needs": [
+    "backup_batch"
+   ],
+   "io": [
+    "Ne"
+   ],
+   "status": "partial",
+   "note": "批次元信息需 Ne 或独立 Meta 服务提供"
+  }
+ ],
+ "errors": {
+  "codes": [
+   "cursor_expired",
+   "io_not_found",
+   "key_invalid",
+   "field_not_exposed",
+   "dangling_required",
+   "scope_blocked",
+   "page_too_large"
+  ]
+ },
+ "paging": {
+  "default": 50,
+  "max": 500,
+  "cursor": "keyset"
+ }
+}

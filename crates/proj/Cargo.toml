@@ -1,0 +1,8 @@
+[package]
+name = "ims_mem2_proj"
+version = "0.1.0"
+edition = "2021"
+
+[dependencies]
+ims_mem2 = { path = "../core" }
+rusqlite = { version = "0.32", features = ["bundled"] }
